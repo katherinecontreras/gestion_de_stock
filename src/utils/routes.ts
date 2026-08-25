@@ -1,0 +1,17 @@
+export const APP_ROUTES = {
+  home: "/",
+  login: "/autentication/login",
+  registro: "/autentication/registro",
+  recuperar: "/autentication/recuperar",
+  articulos: "/pages/articulos",
+  articuloHistorial: (id: string) => `/pages/articulos/${id}`,
+  familias: "/pages/familias",
+  familiaDetalle: (id: string) => `/pages/familias/${id}`,
+  proveedores: "/pages/proveedores",
+  depositos: "/pages/depositos",
+  movimientos: "/pages/movimientos",
+  movimientoNuevo: "/pages/movimientos/nuevo",
+  movimientoDetalle: (id: string) => `/pages/movimientos/${id}`,
+  responsables: "/pages/responsables",
+  notificaciones: "/pages/notificaciones",
+} as const;

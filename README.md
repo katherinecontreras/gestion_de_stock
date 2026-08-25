@@ -1,70 +1,165 @@
-# Getting Started with Create React App
+# Plataforma de Gestión de Stock — Simetra Service SA
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Sistema interno para registrar artículos, proveedores y depósitos, asignar responsables y controlar movimientos de stock (entrada, salida y transferencia) entre depósitos.
 
-## Available Scripts
+## Stack tecnológico
 
-In the project directory, you can run:
+| Capa | Tecnología |
+| --- | --- |
+| Frontend / App Router | Next.js 15, React 19, TypeScript |
+| Estilos | Tailwind CSS |
+| Animaciones | Motion (`motion/react`) |
+| Backend / Auth / Storage | Supabase (PostgreSQL, Auth, Storage, RLS) |
+| Correos transaccionales | EmailJS |
+| Hosting / CI/CD | Vercel |
 
-### `npm start`
+## Estructura del proyecto
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```text
+gestion-stock/
+├── public/                     # Archivos estáticos públicos (logos, favicon, etc.)
+├── src/
+│   ├── app/                    # Rutas y Páginas de la aplicación (App Router)
+│   │   ├── autentication/      # Grupo de rutas de autenticación
+│   │   │   ├── login/          # Página de Login
+│   │   │   ├── registro/       # Página de Registro / Alta contraseña
+│   │   │   └── recuperar/      # Página de Recuperación de contraseña
+│   │   ├── pages/              # Grupo de rutas protegidas del sistema
+│   │   │   ├── responsables/   # Administración de responsables
+│   │   │   ├── articulos/      # Gestión de artículos y carga masiva
+│   │   │   │   └── [id]/       # Historial individual del artículo
+│   │   │   ├── familias/       # Gestión de Familias y Grupos
+│   │   │   │   └── [id]/       # Detalle y gestión de grupos/artículos
+│   │   │   ├── proveedores/    # Gestión de Proveedores
+│   │   │   ├── depositos/      # Gestión de Depósitos
+│   │   │   ├── movimientos/    # Vista de movimientos y detalle
+│   │   │   │   ├── nuevo/      # Paso a paso de nuevo movimiento
+│   │   │   │   └── [id]/       # Detalle de un movimiento
+│   │   │   └── notificaciones/ # Historial completo de notificaciones
+│   │   ├── layouts/            # Layout global
+│   │   │   ├── Navbar/         # Navbar responsive (PC / laptop / teléfono)
+│   │   │   ├── ToastProvider/  # Toast adaptable de confirmación o notificación
+│   │   │   ├── Sidebar/        # Navegación responsive
+│   │   │   ├── Footer/         # Derechos reservados y dedicatoria
+│   │   │   └── Layout.tsx      # Integra Navbar, Toast, Sidebar y Footer
+│   │   └── page.tsx            # Redirección automática según sesión (Login o Inicio)
+│   ├── components/             # Componentes reutilizables modularizados
+│   │   ├── ui/                 # Componentes genéricos UI (Botones, Inputs, Tablas, Badges)
+│   │   ├── modals/             # Modales globales (Formulario de carga, Confirmaciones, Toast)
+│   │   ├── layout/             # Componentes de estructura (Campana y placeholders)
+│   │   └── modules/            # Componentes específicos por módulo
+│   ├── lib/
+│   │   ├── supabase/           # Cliente de Supabase (browserClient, serverClient)
+│   │   └── emailjs/            # Configuración y helpers para EmailJS
+│   ├── services/               # Capa de consumo de datos y llamadas a base de datos
+│   ├── hooks/                  # Custom Hooks (useAuth, useNotification)
+│   ├── types/                  # Definiciones de TypeScript e Interfaces de la Base de Datos
+│   └── utils/                  # Formatters de fecha, validadores, rutas
+├── supabase/
+│   └── schema.sql              # Script SQL con esquemas, RLS, Triggers y RPCs
+├── .env.local.example
+└── README.md
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Rutas de la aplicación:
 
-### `npm test`
+- `/autentication/login`, `/autentication/registro`, `/autentication/recuperar`
+- `/pages/responsables` — administración de responsables (solo Administrador)
+- `/pages/articulos` y `/pages/articulos/[id]` — catálogo e historial
+- `/pages/familias` y `/pages/familias/[id]` — familias, grupos y asignación de artículos
+- `/pages/proveedores`
+- `/pages/depositos`
+- `/pages/movimientos`, `/pages/movimientos/nuevo`, `/pages/movimientos/[id]`
+- `/pages/notificaciones` — historial completo
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Requisitos previos
 
-### `npm run build`
+- Node.js 20 o superior
+- npm
+- Un proyecto de Supabase dedicado llamado **gestion_de_stock** (no reutilizar bases de otros sistemas de Simetra)
+- Cuenta de Vercel vinculada al repositorio de GitHub
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 1. Instalar dependencias
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm install
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 2. Conectar variables de entorno con Supabase
 
-### `npm run eject`
+1. En el Dashboard de Supabase, abrí el proyecto `gestion_de_stock`.
+2. Andá a **Project Settings → API**.
+3. Copiá:
+   - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+   - **anon / public** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **service_role** → `SUPABASE_SERVICE_ROLE_KEY` (solo servidor; no la subas a Git ni la uses en el cliente)
+4. En la raíz del repo:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+cp .env.local.example .env.local
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+5. Completá los tres valores en `.env.local`.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+`SUPABASE_SERVICE_ROLE_KEY` omite RLS. Usala únicamente en Server Actions, Route Handlers o jobs de servidor.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 3. Ejecutar el esquema SQL
 
-## Learn More
+1. En Supabase, abrí **SQL Editor**.
+2. Pegá y ejecutá el contenido de `supabase/schema.sql`.
+3. El script crea tablas, enums, índices, RLS, triggers de notificaciones, actualización automática de inventario y RPCs transaccionales.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+También crea el bucket de Storage `remitos` para las imágenes de remito.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 4. Desarrollo local
 
-### Code Splitting
+```bash
+npm run dev
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+La app queda en [http://localhost:3000](http://localhost:3000). Sin sesión, redirige a `/autentication/login`.
 
-### Analyzing the Bundle Size
+Scripts:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+| Comando | Descripción |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción |
+| `npm start` | Sirve el build |
+| `npm run lint` | ESLint (Next.js) |
 
-### Making a Progressive Web App
+## 5. Despliegue en Vercel
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+El repositorio ya está vinculado a GitHub y a Vercel. Al pasar de Create React App a Next.js, verificá en el proyecto de Vercel:
 
-### Advanced Configuration
+1. **Framework Preset:** Next.js
+2. **Build Command:** `next build` (o el default de Next)
+3. **Output:** dejar el default de Next.js (no usar la carpeta `build` de CRA)
+4. En **Settings → Environment Variables**, cargá las mismas claves que en `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (marcada como Server / no exponer al client bundle)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Un push a la rama de producción dispara el deploy automático.
 
-### Deployment
+## Convenciones de datos
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- Identificadores de negocio en `snake_case` (PostgreSQL).
+- Borrado lógico (`estado = inactivo`) en maestros: proveedores, responsables, depósitos, artículos, familias y grupos.
+- Contraseñas solo en **Supabase Auth**; `responsables` se vincula con `auth_user_id`.
+- El login de la app usa DNI: se resuelve el email con `rpc_email_por_dni` y luego `signInWithPassword`.
+- Los movimientos se persisten con `rpc_crear_movimiento` para que el encabezado y el detalle entren en la misma transacción.
 
-### `npm run build` fails to minify
+## Roles
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+| Rol | Alcance |
+| --- | --- |
+| Administrador | ABM completo, invitaciones, historial global y notificaciones |
+| Responsable_Deposito | Artículos y movimientos de sus depósitos; puede cargar movimientos |
+| Vista_Consulta | Solo lectura (reservado para asignaciones futuras) |
+
+Las políticas RLS del esquema restringen al responsable de depósito a filas de sus depósitos.
+
+## Estado de esta fase
+
+Fase 1: arquitectura, tipado, conexión a Supabase y esquema inicial. Las pantallas funcionales se implementan a continuación, módulo por módulo.

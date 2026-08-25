@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --main-bg: #f5f4fd;
+  --item-hover: #f9f8fb;
+  --secondary-bg: #251d33;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --surface-subtle: #f1f5f9;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --accent: #0f172a;
+  --accent-hover: #1e293b;
+  --accent-fg: #ffffff;
+  --overlay: rgba(15, 23, 42, 0.4);
+  --input-border: #cbd5e1;
+  --input-focus: #0f172a;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-text: #b91c1c;
+  --success-text: #047857;
+  --success-bg: #ecfdf5;
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--main-bg);
+  color: var(--text-secondary);
+  font-family: Poppins, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+#__next {
+  height: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+.font-mono-code {
+  font-family: ui-monospace, Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+@keyframes spin-linear {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin-linear 0.85s linear infinite;
+}
