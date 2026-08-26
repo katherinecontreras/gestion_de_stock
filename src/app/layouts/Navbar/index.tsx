@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Settings, User } from "lucide-react";
+import { Settings, User } from "lucide-react";
 import { Brand } from "@/components/layout/brand";
 import { Campana } from "@/components/layout/campana";
-import { Button } from "@/components/ui/button";
 import { APP_ROUTES } from "@/utils/routes";
+import { LogoutButton } from "./logout-button";
 
 export function Navbar() {
   return (
@@ -26,10 +26,7 @@ export function Navbar() {
         >
           <User size={18} strokeWidth={1.6} />
         </span>
-        <Button variant="logout" className="ml-1">
-          <LogOut size={16} strokeWidth={1.6} />
-          <span className="hidden sm:inline">Cerrar sesión</span>
-        </Button>
+        <LogoutButton />
       </div>
     </header>
   );

@@ -37,7 +37,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Poppins", "sans-serif"],
+        sans: ["Poppins", "Segoe UI", "system-ui", "sans-serif"],
         mono: [
           "ui-monospace",
           "Consolas",

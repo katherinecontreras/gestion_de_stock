@@ -39,7 +39,7 @@ body {
 body {
   background: var(--main-bg);
   color: var(--text-secondary);
-  font-family: Poppins, sans-serif;
+  font-family: Poppins, "Segoe UI", system-ui, sans-serif;
   font-size: 0.875rem;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;

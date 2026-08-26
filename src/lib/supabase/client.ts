@@ -7,7 +7,7 @@ export function createClient() {
 
   if (!isConfigured) {
     throw new Error(
-      "Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY. Copiá .env.local.example a .env.local.",
+      "Faltan NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY (o NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY). Completá el archivo .env.",
     );
   }
 
