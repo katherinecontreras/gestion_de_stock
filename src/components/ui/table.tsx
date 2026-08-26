@@ -3,7 +3,7 @@ import { cn } from "@/utils/cn";
 
 type TableShellProps = {
   toolbar?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   empty?: string;
   className?: string;
 };
