@@ -71,10 +71,10 @@ npm install
 4. En la raíz del repo:
 
 ```bash
-cp .env.local.example .env.local
+cp .env.local.example .env
 ```
 
-5. Completá los tres valores en `.env.local`.
+5. Completá los valores en `.env` (local, no se sube a Git).
 
 `SUPABASE_SERVICE_ROLE_KEY` omite RLS. Usala únicamente en scripts de servidor como `npm run seed:admin`. No la expongas en el cliente.
 
@@ -105,14 +105,13 @@ Scripts:
 
 ## 5. Despliegue en Vercel
 
+El `.env` local **no** viaja al deploy. El build de producción lee `.env.production` (claves públicas del cliente: Supabase anon, EmailJS y la URL de Vercel). `SUPABASE_SERVICE_ROLE_KEY` no va en Vercel.
+
 1. **Framework Preset:** Vite
 2. **Build Command:** `npm run build`
 3. **Output Directory:** `dist`
-4. En **Settings → Environment Variables**, cargá:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-`SUPABASE_SERVICE_ROLE_KEY` no hace falta en Vercel si solo corre el cliente.
+Los enlaces de los mails (recuperar contraseña) siempre usan `NEXT_PUBLIC_APP_URL` (`https://gestion-de-stock.vercel.app`), nunca localhost.
 
 Un push a la rama de producción dispara el deploy automático.
 

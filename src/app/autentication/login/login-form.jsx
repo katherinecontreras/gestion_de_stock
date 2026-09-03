@@ -83,9 +83,8 @@ export function LoginForm({ configured = true }) {
     <form onSubmit={handleSubmit} className="space-y-3">
       {!configured ? (
         <Alert>
-          Faltan las claves reales de Supabase en el archivo .env. Pegá Project
-          URL y la anon key (o publishable) de gestion_de_stock y reiniciá npm
-          run dev.
+          Faltan las claves de Supabase. En local completalas en el archivo
+          .env. En Vercel tienen que estar en el build de producción.
         </Alert>
       ) : null}
       {error ? <Alert>{error}</Alert> : null}

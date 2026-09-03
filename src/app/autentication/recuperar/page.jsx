@@ -15,6 +15,7 @@ import {
     explainRecuperarError,
     solicitarRecuperacion,
 } from "@/services/recuperar";
+import { buildRecuperarLink } from "@/lib/app-url";
 import { APP_ROUTES } from "@/utils/routes";
 import { digitsOnly, isValidEmail, isValidPassword, passwordsMatch } from "@/utils/validators";
 
@@ -78,7 +79,10 @@ export default function RecuperarPage() {
         setPending(true);
         try {
             const result = await solicitarRecuperacion(digitsOnly(dni), email.trim());
-            const link = `${window.location.origin}${APP_ROUTES.recuperar}?token=${encodeURIComponent(result.token)}&dni=${encodeURIComponent(result.dni ?? dni)}`;
+            const link = buildRecuperarLink({
+                token: result.token,
+                dni: result.dni ?? dni,
+            });
             await sendRecuperarContrasena({
                 email: result.email,
                 nombre: result.nombre ?? nombre,
