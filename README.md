@@ -6,7 +6,7 @@ Sistema interno para registrar artículos, proveedores y depósitos, asignar res
 
 | Capa | Tecnología |
 | --- | --- |
-| Frontend / App Router | Next.js 15, React 19, TypeScript |
+| Frontend | Vite, React 19, JavaScript |
 | Estilos | Tailwind CSS |
 | Animaciones | Motion (`motion/react`) |
 | Backend / Auth / Storage | Supabase (PostgreSQL, Auth, Storage, RLS) |
@@ -19,44 +19,19 @@ Sistema interno para registrar artículos, proveedores y depósitos, asignar res
 gestion-stock/
 ├── public/                     # Archivos estáticos públicos (logos, favicon, etc.)
 ├── src/
-│   ├── app/                    # Rutas y Páginas de la aplicación (App Router)
-│   │   ├── autentication/      # Grupo de rutas de autenticación
-│   │   │   ├── login/          # Página de Login
-│   │   │   ├── registro/       # Página de Registro / Alta contraseña
-│   │   │   └── recuperar/      # Página de Recuperación de contraseña
-│   │   ├── pages/              # Grupo de rutas protegidas del sistema
-│   │   │   ├── responsables/   # Administración de responsables
-│   │   │   ├── articulos/      # Gestión de artículos y carga masiva
-│   │   │   │   └── [id]/       # Historial individual del artículo
-│   │   │   ├── familias/       # Gestión de Familias y Grupos
-│   │   │   │   └── [id]/       # Detalle y gestión de grupos/artículos
-│   │   │   ├── proveedores/    # Gestión de Proveedores
-│   │   │   ├── depositos/      # Gestión de Depósitos
-│   │   │   ├── movimientos/    # Vista de movimientos y detalle
-│   │   │   │   ├── nuevo/      # Paso a paso de nuevo movimiento
-│   │   │   │   └── [id]/       # Detalle de un movimiento
-│   │   │   └── notificaciones/ # Historial completo de notificaciones
-│   │   ├── layouts/            # Layout global
-│   │   │   ├── Navbar/         # Navbar responsive (PC / laptop / teléfono)
-│   │   │   ├── ToastProvider/  # Toast adaptable de confirmación o notificación
-│   │   │   ├── Sidebar/        # Navegación responsive
-│   │   │   ├── Footer/         # Derechos reservados y dedicatoria
-│   │   │   └── Layout.tsx      # Integra Navbar, Toast, Sidebar y Footer
-│   │   └── page.tsx            # Redirección automática según sesión (Login o Inicio)
-│   ├── components/             # Componentes reutilizables modularizados
-│   │   ├── ui/                 # Componentes genéricos UI (Botones, Inputs, Tablas, Badges)
-│   │   ├── modals/             # Modales globales (Formulario de carga, Confirmaciones, Toast)
-│   │   ├── layout/             # Componentes de estructura (Campana y placeholders)
-│   │   └── modules/            # Componentes específicos por módulo
-│   ├── lib/
-│   │   ├── supabase/           # Cliente de Supabase (browserClient, serverClient)
-│   │   └── emailjs/            # Configuración y helpers para EmailJS
-│   ├── services/               # Capa de consumo de datos y llamadas a base de datos
-│   ├── hooks/                  # Custom Hooks (useAuth, useNotification)
-│   ├── types/                  # Definiciones de TypeScript e Interfaces de la Base de Datos
-│   └── utils/                  # Formatters de fecha, validadores, rutas
+│   ├── App.jsx                 # Rutas de React Router
+│   ├── main.jsx                # Entrada de Vite
+│   ├── app/
+│   │   ├── autentication/      # Login, registro y recuperación
+│   │   └── layouts/            # Navbar, Sidebar, Footer, toasts
+│   ├── app-spa/                # Pantallas del área logueada
+│   ├── components/             # UI, modales y módulos
+│   ├── lib/                    # Supabase (browser) y EmailJS
+│   ├── services/               # Llamadas a la base
+│   ├── hooks/                  # useAuth, notificaciones, perfil
+│   └── utils/                  # Formato, validadores, rutas, Excel
 ├── supabase/
-│   └── schema.sql              # Script SQL con esquemas, RLS, Triggers y RPCs
+│   └── schema.sql
 ├── .env.local.example
 └── README.md
 ```
@@ -64,13 +39,13 @@ gestion-stock/
 Rutas de la aplicación:
 
 - `/autentication/login`, `/autentication/registro`, `/autentication/recuperar`
-- `/pages/responsables` — administración de responsables (solo Administrador)
-- `/pages/articulos` y `/pages/articulos/[id]` — catálogo e historial
-- `/pages/familias` y `/pages/familias/[id]` — familias, grupos y asignación de artículos
-- `/pages/proveedores`
-- `/pages/depositos`
-- `/pages/movimientos`, `/pages/movimientos/nuevo`, `/pages/movimientos/[id]`
-- `/pages/notificaciones` — historial completo
+- `/responsables` — administración de responsables (solo Administrador)
+- `/articulos` y `/articulos/:id` — catálogo e historial
+- `/familias` y `/familias/:id` — familias, grupos y asignación de artículos
+- `/proveedores`
+- `/depositos`
+- `/movimientos`, `/movimientos/nuevo`, `/movimientos/:id`
+- `/notificaciones` — historial completo
 
 ## Requisitos previos
 
@@ -101,7 +76,7 @@ cp .env.local.example .env.local
 
 5. Completá los tres valores en `.env.local`.
 
-`SUPABASE_SERVICE_ROLE_KEY` omite RLS. Usala únicamente en Server Actions, Route Handlers o jobs de servidor.
+`SUPABASE_SERVICE_ROLE_KEY` omite RLS. Usala únicamente en scripts de servidor como `npm run seed:admin`. No la expongas en el cliente.
 
 ## 3. Ejecutar el esquema SQL
 
@@ -123,22 +98,21 @@ Scripts:
 
 | Comando | Descripción |
 | --- | --- |
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | Vite en http://localhost:3000 |
 | `npm run build` | Build de producción |
-| `npm start` | Sirve el build |
-| `npm run lint` | ESLint (Next.js) |
+| `npm run preview` | Sirve el build |
+| `npm run seed:admin` | Alta del primer administrador |
 
 ## 5. Despliegue en Vercel
 
-El repositorio ya está vinculado a GitHub y a Vercel. Al pasar de Create React App a Next.js, verificá en el proyecto de Vercel:
-
-1. **Framework Preset:** Next.js
-2. **Build Command:** `next build` (o el default de Next)
-3. **Output:** dejar el default de Next.js (no usar la carpeta `build` de CRA)
-4. En **Settings → Environment Variables**, cargá las mismas claves que en `.env.local`:
+1. **Framework Preset:** Vite
+2. **Build Command:** `npm run build`
+3. **Output Directory:** `dist`
+4. En **Settings → Environment Variables**, cargá:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (marcada como Server / no exponer al client bundle)
+
+`SUPABASE_SERVICE_ROLE_KEY` no hace falta en Vercel si solo corre el cliente.
 
 Un push a la rama de producción dispara el deploy automático.
 
@@ -162,4 +136,4 @@ Las políticas RLS del esquema restringen al responsable de depósito a filas de
 
 ## Estado de esta fase
 
-Fase 1: arquitectura, tipado, conexión a Supabase y esquema inicial. Las pantallas funcionales se implementan a continuación, módulo por módulo.
+Fase 1: arquitectura Vite + React, conexión a Supabase y esquema inicial. Las pantallas funcionales se implementan a continuación, módulo por módulo.

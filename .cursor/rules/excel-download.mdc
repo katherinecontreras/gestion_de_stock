@@ -1,0 +1,18 @@
+---
+description: Toda descarga a Excel usa el helper compartido (header pastel, texto negro, fila fija).
+globs: src/utils/excel*.js,src/components/modules/**/*.jsx,src/app-spa/**/*.jsx
+alwaysApply: false
+---
+
+# Descargas Excel
+
+Toda descarga a Excel de la plataforma (Proveedores, Artículos, Familias/Grupos, plantillas de carga masiva) debe usar `downloadExcelWorkbook` de `src/utils/excel.js`.
+
+No generar `.xlsx` con `xlsx` community, `writeFile` ni estilos propios. El helper ya aplica:
+
+- Encabezado azul pastel `#8EC5EA`, texto negro en negrita, centrado
+- Primera fila fija al hacer scroll
+- Ancho de columnas según el texto
+- Filtro automático
+
+Cada módulo puede tener su parser (`excel-proveedores.js`, etc.) y armar las filas; la escritura del archivo siempre pasa por el helper.

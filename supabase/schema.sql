@@ -2,9 +2,12 @@
 -- Plataforma de Gestión de Stock — Simetra Service SA
 -- Base de datos: gestion_de_stock
 --
+-- Única fuente de verdad del esquema. No hay otros .sql en esta carpeta.
 -- Ejecutar completo en el SQL Editor de Supabase (proyecto dedicado).
 -- NO ejecutar sobre bases de otros sistemas (equipos, checklists, etc.).
 -- Idempotente en lo posible: tipos y seeds usan ON CONFLICT / excepciones.
+-- Ajustes puntuales sobre una base ya creada: se pegan en el chat, y se
+-- reflejan acá para que el archivo quede al día.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -21,9 +24,30 @@ DO $$ BEGIN
   CREATE TYPE public.tipo_rol AS ENUM (
     'Administrador',
     'Responsable_Deposito',
-    'Vista_Consulta'
+    'Vista_Descarga'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Bases ya creadas con Vista_Consulta: se renombra. No agregar un valor nuevo
+-- en el mismo lote (Postgres no deja usarlo hasta commitear).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'tipo_rol'
+      AND e.enumlabel = 'Vista_Consulta'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'tipo_rol'
+      AND e.enumlabel = 'Vista_Descarga'
+  ) THEN
+    EXECUTE 'ALTER TYPE public.tipo_rol RENAME VALUE ''Vista_Consulta'' TO ''Vista_Descarga''';
+  END IF;
 END $$;
 
 DO $$ BEGIN
@@ -45,10 +69,21 @@ DO $$ BEGIN
     'Bienvenida',
     'Ingreso_Plataforma',
     'Recuperacion_Contrasena',
-    'Carga_Movimiento'
+    'Carga_Movimiento',
+    'Carga_Masiva',
+    'Reactivacion',
+    'Inhabilitacion',
+    'Asignacion_Responsable',
+    'Desvinculacion_Responsable'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Carga_Masiva';
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Reactivacion';
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Inhabilitacion';
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Asignacion_Responsable';
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Desvinculacion_Responsable';
 
 -- -----------------------------------------------------------------------------
 -- TABLAS MAESTRAS
@@ -77,6 +112,24 @@ CREATE TABLE IF NOT EXISTS public.responsables (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.codigos_ingreso (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_responsable   uuid NOT NULL UNIQUE REFERENCES public.responsables (id) ON DELETE CASCADE,
+  token            uuid NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  codigo_hash      text NOT NULL,
+  expires_at       timestamptz NOT NULL,
+  intentos         integer NOT NULL DEFAULT 0 CHECK (intentos >= 0),
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.tokens_recuperacion (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_responsable   uuid NOT NULL UNIQUE REFERENCES public.responsables (id) ON DELETE CASCADE,
+  token            uuid NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  expires_at       timestamptz NOT NULL,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.proveedores (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cod_proveedor  varchar(40)  NOT NULL UNIQUE,
@@ -88,7 +141,6 @@ CREATE TABLE IF NOT EXISTS public.proveedores (
 
 CREATE TABLE IF NOT EXISTS public.depositos (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  id_responsable  uuid REFERENCES public.responsables (id) ON DELETE SET NULL,
   codigo          varchar(40)  NOT NULL UNIQUE,
   nombre          varchar(160) NOT NULL,
   ubicacion       varchar(255) NOT NULL,
@@ -97,6 +149,14 @@ CREATE TABLE IF NOT EXISTS public.depositos (
   estado          public.estado_entidad NOT NULL DEFAULT 'activo',
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.depositos_responsables (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_deposito     uuid NOT NULL REFERENCES public.depositos (id) ON DELETE CASCADE,
+  id_responsable  uuid NOT NULL REFERENCES public.responsables (id) ON DELETE CASCADE,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id_deposito, id_responsable)
 );
 
 CREATE TABLE IF NOT EXISTS public.familias (
@@ -161,7 +221,7 @@ CREATE TABLE IF NOT EXISTS public.movimientos (
   id_responsable       uuid NOT NULL REFERENCES public.responsables (id),
   id_deposito_origen   uuid REFERENCES public.depositos (id),
   id_deposito_destino  uuid REFERENCES public.depositos (id),
-  id_proveedor         uuid REFERENCES public.proveedores (id),
+  id_proveedor         uuid REFERENCES public.proveedores (id) ON DELETE SET NULL,
   es_devolucion        boolean NOT NULL DEFAULT false,
   motivo               text,
   fecha                timestamptz NOT NULL DEFAULT now(),
@@ -219,9 +279,14 @@ CREATE TABLE IF NOT EXISTS public.notificaciones_leidas (
 CREATE INDEX IF NOT EXISTS idx_responsables_rol ON public.responsables (id_rol);
 CREATE INDEX IF NOT EXISTS idx_responsables_estado ON public.responsables (estado);
 CREATE INDEX IF NOT EXISTS idx_responsables_auth ON public.responsables (auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_codigos_ingreso_token ON public.codigos_ingreso (token);
+CREATE INDEX IF NOT EXISTS idx_tokens_recuperacion_token ON public.tokens_recuperacion (token);
 
-CREATE INDEX IF NOT EXISTS idx_depositos_responsable ON public.depositos (id_responsable);
 CREATE INDEX IF NOT EXISTS idx_depositos_estado ON public.depositos (estado);
+CREATE INDEX IF NOT EXISTS idx_depositos_responsables_deposito
+  ON public.depositos_responsables (id_deposito);
+CREATE INDEX IF NOT EXISTS idx_depositos_responsables_responsable
+  ON public.depositos_responsables (id_responsable);
 
 CREATE INDEX IF NOT EXISTS idx_grupos_familia ON public.grupos (id_familia);
 CREATE INDEX IF NOT EXISTS idx_articulos_grupo ON public.articulos (id_grupo);
@@ -250,9 +315,9 @@ CREATE INDEX IF NOT EXISTS idx_notif_tabla_valor ON public.notificaciones (tabla
 -- SEEDS DE CATÁLOGOS
 -- -----------------------------------------------------------------------------
 INSERT INTO public.roles (id, tipo, descripcion) VALUES
-  (1, 'Administrador', 'ABM completo, invitaciones, historial y notificaciones'),
+  (1, 'Administrador', 'ABM completo, historial y notificaciones'),
   (2, 'Responsable_Deposito', 'Opera únicamente sobre sus depósitos asignados'),
-  (3, 'Vista_Consulta', 'Solo lectura')
+  (3, 'Vista_Descarga', 'Ve y descarga toda la información; no crea ni edita')
 ON CONFLICT (id) DO UPDATE SET tipo = EXCLUDED.tipo, descripcion = EXCLUDED.descripcion;
 
 INSERT INTO public.tipos_movimiento (id, tipo, descripcion) VALUES
@@ -270,7 +335,12 @@ INSERT INTO public.tipos_notificacion (id, tipo, descripcion) VALUES
   (6, 'Bienvenida', 'El responsable completó su registro'),
   (7, 'Ingreso_Plataforma', 'Ingreso exitoso con nueva contraseña'),
   (8, 'Recuperacion_Contrasena', 'Envío de mail de recuperación'),
-  (9, 'Carga_Movimiento', 'Se cargó un movimiento de stock')
+  (9, 'Carga_Movimiento', 'Se cargó un movimiento de stock'),
+  (10, 'Carga_Masiva', 'Carga o actualización masiva por Excel'),
+  (11, 'Reactivacion', 'Se reactivó una familia o un grupo'),
+  (12, 'Inhabilitacion', 'Se inhabilitó una familia o un grupo'),
+  (13, 'Asignacion_Responsable', 'Se asignó un responsable a un depósito'),
+  (14, 'Desvinculacion_Responsable', 'Se quitó un responsable de un depósito')
 ON CONFLICT (id) DO UPDATE SET tipo = EXCLUDED.tipo, descripcion = EXCLUDED.descripcion;
 
 SELECT setval(pg_get_serial_sequence('public.roles', 'id'), (SELECT MAX(id) FROM public.roles));
@@ -338,6 +408,23 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.fn_es_vista_descarga()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.responsables r
+    JOIN public.roles rol ON rol.id = r.id_rol
+    WHERE r.auth_user_id = auth.uid()
+      AND r.estado = 'activo'
+      AND rol.tipo::text IN ('Vista_Descarga', 'Vista_Consulta') -- Vista_Consulta: nombre viejo, por si quedó alguna fila
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.fn_depositos_del_responsable(p_responsable uuid DEFAULT NULL)
 RETURNS SETOF uuid
 LANGUAGE sql
@@ -345,11 +432,35 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT d.id
-  FROM public.depositos d
+  SELECT dr.id_deposito
+  FROM public.depositos_responsables dr
+  JOIN public.depositos d ON d.id = dr.id_deposito
   WHERE d.estado = 'activo'
-    AND d.id_responsable = COALESCE(p_responsable, public.fn_responsable_id_actual());
+    AND dr.id_responsable = COALESCE(p_responsable, public.fn_responsable_id_actual());
 $$;
+
+-- Pasa el modelo 1–N (depositos.id_responsable) a N–N.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'depositos'
+      AND column_name = 'id_responsable'
+  ) THEN
+    INSERT INTO public.depositos_responsables (id_deposito, id_responsable)
+    SELECT id, id_responsable
+    FROM public.depositos
+    WHERE id_responsable IS NOT NULL
+    ON CONFLICT (id_deposito, id_responsable) DO NOTHING;
+
+    DROP POLICY IF EXISTS propio_deposito_select ON public.depositos;
+
+    ALTER TABLE public.depositos DROP COLUMN id_responsable;
+    DROP INDEX IF EXISTS public.idx_depositos_responsable;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.fn_costo_actual_articulo(p_articulo uuid)
 RETURNS numeric
@@ -541,6 +652,18 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.fn_nombre_responsable(p_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT NULLIF(btrim(concat_ws(' ', r.nombre, r.apellido)), '')
+  FROM public.responsables r
+  WHERE r.id = p_id
+$$;
+
 CREATE OR REPLACE FUNCTION public.fn_insertar_notificacion(
   p_tipo public.tipo_notificacion,
   p_descripcion text,
@@ -558,10 +681,21 @@ AS $$
 DECLARE
   v_id uuid;
   v_tipo_id smallint;
+  v_responsable uuid;
+  v_nombre text;
+  v_descripcion text;
 BEGIN
   SELECT id INTO v_tipo_id FROM public.tipos_notificacion WHERE tipo = p_tipo;
   IF v_tipo_id IS NULL THEN
     RAISE EXCEPTION 'Tipo de notificación inexistente: %', p_tipo;
+  END IF;
+
+  v_responsable := COALESCE(p_responsable, public.fn_responsable_id_actual());
+  v_nombre := public.fn_nombre_responsable(v_responsable);
+  v_descripcion := p_descripcion;
+  IF v_nombre IS NOT NULL
+     AND position(' · por ' || v_nombre in v_descripcion) = 0 THEN
+    v_descripcion := v_descripcion || ' · por ' || v_nombre;
   END IF;
 
   INSERT INTO public.notificaciones (
@@ -574,11 +708,11 @@ BEGIN
     metadata
   ) VALUES (
     v_tipo_id,
-    COALESCE(p_responsable, public.fn_responsable_id_actual()),
+    v_responsable,
     p_responsable_extra,
     p_tabla,
     p_valor,
-    p_descripcion,
+    v_descripcion,
     COALESCE(p_metadata, '{}'::jsonb)
   )
   RETURNING id INTO v_id;
@@ -587,9 +721,221 @@ BEGIN
 END;
 $$;
 
--- Trigger genérico de auditoría (INSERT/UPDATE en maestros).
--- En UPDATE, estado activo→inactivo se trata como Eliminación (borrado lógico).
--- Solo se usa to_jsonb(NEW/OLD) para soportar tablas con columnas distintas.
+CREATE OR REPLACE FUNCTION public.fn_insertar_notificacion_por_nombre(
+  p_tipo text,
+  p_descripcion text,
+  p_tabla text DEFAULT NULL,
+  p_valor uuid DEFAULT NULL,
+  p_metadata jsonb DEFAULT '{}'::jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+  v_tipo_id smallint;
+  v_responsable uuid;
+  v_nombre text;
+  v_descripcion text;
+BEGIN
+  SELECT t.id
+  INTO v_tipo_id
+  FROM public.tipos_notificacion t
+  WHERE t.tipo::text = p_tipo;
+
+  IF v_tipo_id IS NULL THEN
+    RAISE WARNING 'Tipo de notificación no cargado: %', p_tipo;
+    RETURN NULL;
+  END IF;
+
+  v_responsable := public.fn_responsable_id_actual();
+  v_nombre := public.fn_nombre_responsable(v_responsable);
+  v_descripcion := p_descripcion;
+  IF v_nombre IS NOT NULL
+     AND position(' · por ' || v_nombre in v_descripcion) = 0 THEN
+    v_descripcion := v_descripcion || ' · por ' || v_nombre;
+  END IF;
+
+  INSERT INTO public.notificaciones (
+    id_tipo_notificacion,
+    id_responsable,
+    tabla_afectada,
+    id_valor_ajustado,
+    descripcion,
+    metadata
+  ) VALUES (
+    v_tipo_id,
+    v_responsable,
+    p_tabla,
+    p_valor,
+    v_descripcion,
+    COALESCE(p_metadata, '{}'::jsonb)
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_notificar_cambio_estado_familia_grupo(
+  p_tabla text,
+  p_id uuid,
+  p_label text,
+  p_estado_nuevo text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_activo boolean := p_estado_nuevo = 'activo';
+  v_tipo text := CASE WHEN v_activo THEN 'Reactivacion' ELSE 'Inhabilitacion' END;
+  v_texto text;
+BEGIN
+  IF p_tabla = 'familias' THEN
+    v_texto := CASE
+      WHEN v_activo THEN
+        format('Se reactivó la familia %s. Todos sus grupos también se reactivaron.', p_label)
+      ELSE
+        format('Se inhabilitó la familia %s. Todos sus grupos también se inhabilitaron.', p_label)
+    END;
+  ELSIF p_tabla = 'proveedores' THEN
+    v_texto := CASE
+      WHEN v_activo THEN format('Se reactivó el proveedor %s.', p_label)
+      ELSE format('Se inhabilitó el proveedor %s. Se desvinculó de los movimientos.', p_label)
+    END;
+  ELSIF p_tabla = 'depositos' THEN
+    v_texto := CASE
+      WHEN v_activo THEN format('Se reactivó el depósito %s.', p_label)
+      ELSE format('Se inhabilitó el depósito %s. Ya no se puede usar en movimientos nuevos. El historial se conserva.', p_label)
+    END;
+  ELSE
+    v_texto := CASE
+      WHEN v_activo THEN format('Se reactivó el grupo %s.', p_label)
+      ELSE format('Se inhabilitó el grupo %s.', p_label)
+    END;
+  END IF;
+
+  RETURN public.fn_insertar_notificacion_por_nombre(
+    v_tipo,
+    v_texto,
+    p_tabla,
+    p_id,
+    jsonb_build_object('estado_nuevo', p_estado_nuevo)
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_notificar_cambio_estado_familia_grupo(text, uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_insertar_notificacion_por_nombre(text, text, text, uuid, jsonb) TO authenticated;
+
+-- Código + nombre/descripción para el texto de las notificaciones de maestros.
+CREATE OR REPLACE FUNCTION public.fn_etiqueta_maestro(p_row jsonb)
+RETURNS text
+LANGUAGE plpgsql
+IMMUTABLE
+AS $$
+DECLARE
+  v_codigo text;
+  v_detalle text;
+BEGIN
+  v_codigo := NULLIF(btrim(COALESCE(
+    p_row ->> 'codigo',
+    p_row ->> 'cod_proveedor',
+    ''
+  )), '');
+
+  v_detalle := NULLIF(btrim(COALESCE(
+    p_row ->> 'descripcion',
+    p_row ->> 'nombre',
+    p_row ->> 'razon_social',
+    ''
+  )), '');
+
+  IF v_codigo IS NOT NULL AND v_detalle IS NOT NULL AND v_codigo IS DISTINCT FROM v_detalle THEN
+    RETURN v_codigo || ' – ' || v_detalle;
+  END IF;
+
+  RETURN COALESCE(
+    v_codigo,
+    v_detalle,
+    NULLIF(btrim(COALESCE(p_row ->> 'dni', '')), ''),
+    p_row ->> 'id'
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.fn_etiqueta_maestro(jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.fn_texto_alta_grupos_familia(
+  p_cantidad integer,
+  p_codigo text,
+  p_descripcion text
+)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT format(
+    'Alta de %s %s en familia %s – %s',
+    p_cantidad,
+    CASE WHEN p_cantidad = 1 THEN 'grupo' ELSE 'grupos' END,
+    COALESCE(NULLIF(btrim(p_codigo), ''), '?'),
+    COALESCE(btrim(p_descripcion), '')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_notificar_alta_grupos_familia(
+  p_familia uuid,
+  p_cantidad integer,
+  p_extra jsonb DEFAULT '{}'::jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_codigo text;
+  v_descripcion text;
+BEGIN
+  IF p_familia IS NULL OR COALESCE(p_cantidad, 0) <= 0 THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT f.codigo, f.descripcion
+  INTO v_codigo, v_descripcion
+  FROM public.familias f
+  WHERE f.id = p_familia;
+
+  RETURN public.fn_insertar_notificacion(
+    CASE
+      WHEN COALESCE(p_extra ->> 'origen', '') IN ('carga_masiva', 'migracion_alta_grupos')
+        THEN 'Carga_Masiva'::public.tipo_notificacion
+      ELSE 'Creacion'::public.tipo_notificacion
+    END,
+    public.fn_texto_alta_grupos_familia(p_cantidad, v_codigo, v_descripcion),
+    'grupos',
+    p_familia,
+    public.fn_responsable_id_actual(),
+    NULL,
+    jsonb_strip_nulls(
+      jsonb_build_object(
+        'agrupado_familia', true,
+        'id_familia', p_familia,
+        'cantidad', p_cantidad
+      ) || COALESCE(p_extra, '{}'::jsonb)
+    )
+  );
+END;
+$$;
+
+-- Trigger genérico de auditoría (INSERT/UPDATE/DELETE en maestros).
+-- Un fallo al notificar NO debe revertir el alta/edición/baja.
+-- Familias y grupos: el estado se edita; el DELETE es el borrado real.
 CREATE OR REPLACE FUNCTION public.fn_trg_notificar_maestro()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -605,114 +951,155 @@ DECLARE
   v_rol_new text;
   v_row jsonb;
 BEGIN
-  IF TG_OP = 'INSERT' THEN
-    v_row := to_jsonb(NEW);
-    v_label := COALESCE(
-      v_row ->> 'codigo',
-      v_row ->> 'cod_proveedor',
-      v_row ->> 'nombre',
-      v_row ->> 'razon_social',
-      v_row ->> 'descripcion',
-      v_row ->> 'dni',
-      NEW.id::text
-    );
-
-    IF TG_TABLE_NAME = 'costos_articulos' THEN
-      PERFORM public.fn_insertar_notificacion(
-        'Creacion',
-        format('Se registró un nuevo costo %s para el artículo %s', NEW.costo, NEW.id_articulo),
-        'costos_articulos',
-        NEW.id,
-        NEW.id_responsable,
-        NULL,
-        jsonb_build_object('id_articulo', NEW.id_articulo, 'costo', NEW.costo)
-      );
-    ELSIF TG_TABLE_NAME = 'responsables' THEN
-      PERFORM public.fn_insertar_notificacion(
-        'Creacion',
-        format('Se creó el responsable %s %s (DNI %s)', NEW.nombre, NEW.apellido, NEW.dni),
-        'responsables',
-        NEW.id,
-        public.fn_responsable_id_actual(),
-        NEW.id,
-        jsonb_build_object('dni', NEW.dni, 'email', NEW.email)
-      );
-    ELSE
-      PERFORM public.fn_insertar_notificacion(
-        'Creacion',
-        format('Alta en %s: %s', TG_TABLE_NAME, v_label),
-        TG_TABLE_NAME,
-        NEW.id
-      );
+  IF current_setting('app.carga_masiva', true) = '1'
+     OR (
+       TG_TABLE_NAME = 'grupos'
+       AND current_setting('app.omitir_notif_grupo', true) = '1'
+     ) THEN
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
     END IF;
-
     RETURN NEW;
   END IF;
 
-  -- UPDATE
-  IF TG_TABLE_NAME = 'responsables' AND OLD.id_rol IS DISTINCT FROM NEW.id_rol THEN
-    SELECT tipo::text INTO v_rol_old FROM public.roles WHERE id = OLD.id_rol;
-    SELECT tipo::text INTO v_rol_new FROM public.roles WHERE id = NEW.id_rol;
-    PERFORM public.fn_insertar_notificacion(
-      'Asignacion_Rol',
-      format(
-        'Se asignó el rol %s al responsable %s %s, que anteriormente tenía el rol %s',
-        v_rol_new, NEW.nombre, NEW.apellido, v_rol_old
-      ),
-      'responsables',
-      NEW.id,
-      public.fn_responsable_id_actual(),
-      NEW.id,
-      jsonb_build_object('rol_anterior', v_rol_old, 'rol_nuevo', v_rol_new)
-    );
+  BEGIN
+    IF TG_OP = 'DELETE' THEN
+      v_label := public.fn_etiqueta_maestro(to_jsonb(OLD));
+      PERFORM public.fn_insertar_notificacion(
+        'Eliminacion',
+        format('Borrado en %s: %s', TG_TABLE_NAME, v_label),
+        TG_TABLE_NAME,
+        OLD.id,
+        public.fn_responsable_id_actual(),
+        NULL
+      );
+    ELSIF TG_OP = 'INSERT' THEN
+      v_row := to_jsonb(NEW);
+      v_label := public.fn_etiqueta_maestro(v_row);
+
+      IF TG_TABLE_NAME = 'costos_articulos' THEN
+        PERFORM public.fn_insertar_notificacion(
+          'Creacion',
+          format('Se registró un nuevo costo %s para el artículo %s', NEW.costo, NEW.id_articulo),
+          'costos_articulos',
+          NEW.id,
+          NEW.id_responsable,
+          NULL,
+          jsonb_build_object('id_articulo', NEW.id_articulo, 'costo', NEW.costo)
+        );
+      ELSIF TG_TABLE_NAME = 'responsables' THEN
+        PERFORM public.fn_insertar_notificacion(
+          'Creacion',
+          format('Se creó el responsable %s %s (DNI %s)', NEW.nombre, NEW.apellido, NEW.dni),
+          'responsables',
+          NEW.id,
+          public.fn_responsable_id_actual(),
+          NEW.id,
+          jsonb_build_object('dni', NEW.dni, 'email', NEW.email)
+        );
+      ELSIF TG_TABLE_NAME = 'grupos' THEN
+        PERFORM public.fn_notificar_alta_grupos_familia(
+          NEW.id_familia,
+          1,
+          jsonb_build_object('id_grupo', NEW.id)
+        );
+      ELSE
+        PERFORM public.fn_insertar_notificacion(
+          'Creacion',
+          format('Alta en %s: %s', TG_TABLE_NAME, v_label),
+          TG_TABLE_NAME,
+          NEW.id
+        );
+      END IF;
+    ELSE
+      IF TG_TABLE_NAME = 'responsables' AND OLD.id_rol IS DISTINCT FROM NEW.id_rol THEN
+        SELECT tipo::text INTO v_rol_old FROM public.roles WHERE id = OLD.id_rol;
+        SELECT tipo::text INTO v_rol_new FROM public.roles WHERE id = NEW.id_rol;
+        PERFORM public.fn_insertar_notificacion(
+          'Asignacion_Rol',
+          format(
+            'Se asignó el rol %s al responsable %s %s, que anteriormente tenía el rol %s',
+            v_rol_new, NEW.nombre, NEW.apellido, v_rol_old
+          ),
+          'responsables',
+          NEW.id,
+          public.fn_responsable_id_actual(),
+          NEW.id,
+          jsonb_build_object('rol_anterior', v_rol_old, 'rol_nuevo', v_rol_new)
+        );
+      END IF;
+
+      IF TG_TABLE_NAME = 'responsables' THEN
+        v_omitir := v_omitir || ARRAY['id_rol', 'auth_user_id', 'registrado'];
+        v_extra := NEW.id;
+      END IF;
+
+      IF TG_TABLE_NAME = 'depositos' THEN
+        v_omitir := v_omitir || ARRAY['cant_articulos', 'costo_total'];
+      END IF;
+
+      IF TG_TABLE_NAME IN ('familias', 'grupos', 'proveedores', 'depositos') THEN
+        v_omitir := v_omitir || ARRAY['estado'];
+      END IF;
+
+      IF TG_TABLE_NAME NOT IN ('familias', 'grupos', 'proveedores', 'depositos')
+         AND to_jsonb(OLD) ? 'estado'
+         AND (to_jsonb(OLD) ->> 'estado') = 'activo'
+         AND (to_jsonb(NEW) ->> 'estado') = 'inactivo' THEN
+        v_label := public.fn_etiqueta_maestro(to_jsonb(NEW));
+        PERFORM public.fn_insertar_notificacion(
+          'Eliminacion',
+          format('Borrado lógico en %s: %s', TG_TABLE_NAME, v_label),
+          TG_TABLE_NAME,
+          NEW.id,
+          public.fn_responsable_id_actual(),
+          v_extra
+        );
+      ELSE
+        v_diff := public.fn_diff_registros(to_jsonb(OLD), to_jsonb(NEW), v_omitir);
+        IF v_diff IS NOT NULL AND btrim(v_diff) <> '' THEN
+          PERFORM public.fn_insertar_notificacion(
+            'Modificacion',
+            format('Modificación en %s: %s', TG_TABLE_NAME, v_diff),
+            TG_TABLE_NAME,
+            NEW.id,
+            public.fn_responsable_id_actual(),
+            v_extra,
+            jsonb_build_object('cambios', v_diff)
+          );
+        END IF;
+      END IF;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'fn_trg_notificar_maestro % %: %', TG_TABLE_NAME, TG_OP, SQLERRM;
+  END;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
   END IF;
+  RETURN NEW;
+END;
+$$;
 
-  IF TG_TABLE_NAME = 'responsables' THEN
-    v_omitir := v_omitir || ARRAY['id_rol', 'auth_user_id', 'registrado'];
-    v_extra := NEW.id;
+-- Al cambiar el estado de una familia, todos sus grupos copian ese estado.
+CREATE OR REPLACE FUNCTION public.fn_trg_sincronizar_estado_grupos_familia()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_prev text;
+BEGIN
+  IF OLD.estado IS DISTINCT FROM NEW.estado THEN
+    v_prev := current_setting('app.omitir_notif_grupo', true);
+    PERFORM set_config('app.omitir_notif_grupo', '1', true);
+    UPDATE public.grupos
+    SET estado = NEW.estado
+    WHERE id_familia = NEW.id
+      AND estado IS DISTINCT FROM NEW.estado;
+    PERFORM set_config('app.omitir_notif_grupo', COALESCE(v_prev, ''), true);
   END IF;
-
-  IF TG_TABLE_NAME = 'depositos' THEN
-    v_omitir := v_omitir || ARRAY['cant_articulos', 'costo_total'];
-  END IF;
-
-  IF to_jsonb(OLD) ? 'estado'
-     AND (to_jsonb(OLD) ->> 'estado') = 'activo'
-     AND (to_jsonb(NEW) ->> 'estado') = 'inactivo' THEN
-    v_label := COALESCE(
-      to_jsonb(NEW) ->> 'codigo',
-      to_jsonb(NEW) ->> 'cod_proveedor',
-      to_jsonb(NEW) ->> 'nombre',
-      to_jsonb(NEW) ->> 'razon_social',
-      to_jsonb(NEW) ->> 'dni',
-      NEW.id::text
-    );
-    PERFORM public.fn_insertar_notificacion(
-      'Eliminacion',
-      format('Borrado lógico en %s: %s', TG_TABLE_NAME, v_label),
-      TG_TABLE_NAME,
-      NEW.id,
-      public.fn_responsable_id_actual(),
-      v_extra
-    );
-    RETURN NEW;
-  END IF;
-
-  v_diff := public.fn_diff_registros(to_jsonb(OLD), to_jsonb(NEW), v_omitir);
-  IF v_diff IS NULL OR btrim(v_diff) = '' THEN
-    RETURN NEW;
-  END IF;
-
-  PERFORM public.fn_insertar_notificacion(
-    'Modificacion',
-    format('Modificación en %s: %s', TG_TABLE_NAME, v_diff),
-    TG_TABLE_NAME,
-    NEW.id,
-    public.fn_responsable_id_actual(),
-    v_extra,
-    jsonb_build_object('cambios', v_diff)
-  );
-
   RETURN NEW;
 END;
 $$;
@@ -851,7 +1238,7 @@ CREATE TRIGGER trg_recalc_deposito_costo
 -- Auditoría de maestros
 DROP TRIGGER IF EXISTS trg_notif_proveedores ON public.proveedores;
 CREATE TRIGGER trg_notif_proveedores
-  AFTER INSERT OR UPDATE ON public.proveedores
+  AFTER INSERT OR UPDATE OR DELETE ON public.proveedores
   FOR EACH ROW EXECUTE FUNCTION public.fn_trg_notificar_maestro();
 
 DROP TRIGGER IF EXISTS trg_notif_responsables ON public.responsables;
@@ -861,17 +1248,24 @@ CREATE TRIGGER trg_notif_responsables
 
 DROP TRIGGER IF EXISTS trg_notif_depositos ON public.depositos;
 CREATE TRIGGER trg_notif_depositos
-  AFTER INSERT OR UPDATE ON public.depositos
+  AFTER INSERT OR UPDATE OR DELETE ON public.depositos
   FOR EACH ROW EXECUTE FUNCTION public.fn_trg_notificar_maestro();
 
 DROP TRIGGER IF EXISTS trg_notif_familias ON public.familias;
 CREATE TRIGGER trg_notif_familias
-  AFTER INSERT OR UPDATE ON public.familias
+  AFTER INSERT OR UPDATE OR DELETE ON public.familias
   FOR EACH ROW EXECUTE FUNCTION public.fn_trg_notificar_maestro();
+
+DROP TRIGGER IF EXISTS trg_familias_activar_grupos ON public.familias;
+DROP TRIGGER IF EXISTS trg_familias_sync_grupos ON public.familias;
+DROP FUNCTION IF EXISTS public.fn_trg_activar_grupos_familia();
+CREATE TRIGGER trg_familias_sync_grupos
+  AFTER UPDATE OF estado ON public.familias
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_sincronizar_estado_grupos_familia();
 
 DROP TRIGGER IF EXISTS trg_notif_grupos ON public.grupos;
 CREATE TRIGGER trg_notif_grupos
-  AFTER INSERT OR UPDATE ON public.grupos
+  AFTER INSERT OR UPDATE OR DELETE ON public.grupos
   FOR EACH ROW EXECUTE FUNCTION public.fn_trg_notificar_maestro();
 
 DROP TRIGGER IF EXISTS trg_notif_articulos ON public.articulos;
@@ -900,10 +1294,629 @@ AS $$
   FROM public.responsables
   WHERE dni = btrim(p_dni)
     AND estado = 'activo'
+    AND registrado = true
   LIMIT 1;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_email_por_dni(text) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.fn_hash_codigo_ingreso(p_codigo text, p_token uuid)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, extensions
+AS $$
+  SELECT encode(digest(convert_to(p_codigo || p_token::text, 'utf8'), 'sha256'), 'hex');
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_emitir_codigo_ingreso(p_responsable uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_token uuid := gen_random_uuid();
+  v_codigo text;
+  v_hash text;
+BEGIN
+  v_codigo := lpad(floor(random() * 1000000)::int::text, 6, '0');
+  v_hash := public.fn_hash_codigo_ingreso(v_codigo, v_token);
+
+  INSERT INTO public.codigos_ingreso (
+    id_responsable, token, codigo_hash, expires_at, intentos
+  ) VALUES (
+    p_responsable, v_token, v_hash, now() + interval '15 minutes', 0
+  )
+  ON CONFLICT (id_responsable) DO UPDATE
+    SET token = EXCLUDED.token,
+        codigo_hash = EXCLUDED.codigo_hash,
+        expires_at = EXCLUDED.expires_at,
+        intentos = 0,
+        created_at = now();
+
+  RETURN jsonb_build_object('token', v_token, 'codigo', v_codigo);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_depositos_activos_registro()
+RETURNS TABLE (id uuid, codigo varchar, nombre varchar, ubicacion varchar)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+  SELECT d.id, d.codigo, d.nombre, d.ubicacion
+  FROM public.depositos d
+  WHERE d.estado = 'activo'
+  ORDER BY d.codigo;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_iniciar_registro(
+  p_nombre text,
+  p_apellido text,
+  p_dni text,
+  p_email text,
+  p_rol text,
+  p_depositos uuid[]
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_nombre text := btrim(COALESCE(p_nombre, ''));
+  v_apellido text := btrim(COALESCE(p_apellido, ''));
+  v_dni text := regexp_replace(COALESCE(p_dni, ''), '\D', '', 'g');
+  v_email text := lower(btrim(COALESCE(p_email, '')));
+  v_rol_id smallint;
+  v_rol_tipo text;
+  v_ids uuid[];
+  v_existente public.responsables%ROWTYPE;
+  v_otro uuid;
+  v_id uuid;
+  v_deposito uuid;
+  v_dep public.depositos%ROWTYPE;
+  v_codigo jsonb;
+  v_antes uuid[] := ARRAY[]::uuid[];
+  v_nombre_persona text;
+  v_dep_codigo text;
+  v_dep_nombre text;
+BEGIN
+  IF v_nombre = '' OR v_apellido = '' OR v_dni = '' OR v_email = '' THEN
+    RAISE EXCEPTION 'Completá nombre, apellido, DNI y email';
+  END IF;
+  IF p_rol NOT IN ('Responsable_Deposito', 'Vista_Descarga') THEN
+    RAISE EXCEPTION 'El rol no es válido para el registro';
+  END IF;
+
+  SELECT r.id, r.tipo::text
+  INTO v_rol_id, v_rol_tipo
+  FROM public.roles r
+  WHERE r.tipo::text = p_rol;
+
+  IF v_rol_id IS NULL THEN
+    RAISE EXCEPTION 'El rol no existe en la plataforma';
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT x), ARRAY[]::uuid[])
+  INTO v_ids
+  FROM unnest(COALESCE(p_depositos, ARRAY[]::uuid[])) AS x
+  WHERE x IS NOT NULL;
+
+  IF v_rol_tipo = 'Responsable_Deposito' THEN
+    IF COALESCE(array_length(v_ids, 1), 0) < 1 THEN
+      RAISE EXCEPTION 'Elegí al menos un depósito';
+    END IF;
+    FOREACH v_deposito IN ARRAY v_ids
+    LOOP
+      SELECT * INTO v_dep FROM public.depositos WHERE id = v_deposito AND estado = 'activo';
+      IF v_dep.id IS NULL THEN
+        RAISE EXCEPTION 'Hay un depósito inválido o inactivo';
+      END IF;
+    END LOOP;
+  ELSE
+    v_ids := ARRAY[]::uuid[];
+  END IF;
+
+  SELECT * INTO v_existente
+  FROM public.responsables
+  WHERE dni = v_dni OR lower(email) = v_email
+  LIMIT 1;
+
+  IF v_existente.id IS NOT NULL THEN
+    IF v_existente.registrado THEN
+      RAISE EXCEPTION 'Ya existe un usuario con ese DNI o email';
+    END IF;
+    SELECT id INTO v_otro
+    FROM public.responsables
+    WHERE id <> v_existente.id
+      AND (dni = v_dni OR lower(email) = v_email);
+    IF v_otro IS NOT NULL THEN
+      RAISE EXCEPTION 'Ya existe un usuario con ese DNI o email';
+    END IF;
+    v_id := v_existente.id;
+    UPDATE public.responsables
+    SET nombre = v_nombre,
+        apellido = v_apellido,
+        dni = v_dni,
+        email = v_email,
+        id_rol = v_rol_id,
+        estado = 'activo',
+        registrado = false
+    WHERE id = v_id;
+  ELSE
+    INSERT INTO public.responsables (
+      nombre, apellido, dni, email, id_rol, estado, registrado
+    ) VALUES (
+      v_nombre, v_apellido, v_dni, v_email, v_rol_id, 'activo', false
+    )
+    RETURNING id INTO v_id;
+  END IF;
+
+  SELECT COALESCE(array_agg(dr.id_deposito), ARRAY[]::uuid[])
+  INTO v_antes
+  FROM public.depositos_responsables dr
+  WHERE dr.id_responsable = v_id;
+
+  DELETE FROM public.depositos_responsables
+  WHERE id_responsable = v_id;
+
+  IF COALESCE(array_length(v_ids, 1), 0) > 0 THEN
+    INSERT INTO public.depositos_responsables (id_deposito, id_responsable)
+    SELECT u.id_deposito, v_id
+    FROM unnest(v_ids) AS u(id_deposito)
+    ON CONFLICT (id_deposito, id_responsable) DO NOTHING;
+  END IF;
+
+  v_nombre_persona := btrim(concat_ws(' ', v_nombre, v_apellido));
+
+  IF v_rol_tipo = 'Responsable_Deposito' THEN
+    FOREACH v_deposito IN ARRAY v_ids
+    LOOP
+      IF NOT (v_deposito = ANY (COALESCE(v_antes, ARRAY[]::uuid[]))) THEN
+        SELECT d.codigo, d.nombre INTO v_dep_codigo, v_dep_nombre
+        FROM public.depositos d WHERE d.id = v_deposito;
+        PERFORM public.fn_insertar_notificacion(
+          'Asignacion_Responsable',
+          format(
+            'Se asignó a %s como responsable del depósito %s – %s.',
+            v_nombre_persona,
+            v_dep_codigo,
+            v_dep_nombre
+          ),
+          'depositos',
+          v_deposito,
+          v_id,
+          v_id,
+          jsonb_build_object('id_deposito', v_deposito, 'id_responsable_asignado', v_id)
+        );
+      END IF;
+    END LOOP;
+  END IF;
+
+  v_codigo := public.fn_emitir_codigo_ingreso(v_id);
+
+  RETURN jsonb_build_object(
+    'token', v_codigo ->> 'token',
+    'codigo', v_codigo ->> 'codigo',
+    'email', v_email,
+    'dni', v_dni,
+    'nombre', v_nombre
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_vincular_auth_registro(p_token uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_resp public.responsables%ROWTYPE;
+  v_auth uuid;
+BEGIN
+  SELECT r.*
+  INTO v_resp
+  FROM public.codigos_ingreso c
+  JOIN public.responsables r ON r.id = c.id_responsable
+  WHERE c.token = p_token;
+
+  IF v_resp.id IS NULL THEN
+    RAISE EXCEPTION 'El registro no es válido. Volvé a empezar.';
+  END IF;
+
+  SELECT u.id
+  INTO v_auth
+  FROM auth.users u
+  WHERE lower(u.email) = lower(v_resp.email)
+  LIMIT 1;
+
+  IF v_auth IS NULL THEN
+    RAISE EXCEPTION 'No se pudo vincular el usuario. Intentá de nuevo.';
+  END IF;
+
+  UPDATE public.responsables
+  SET auth_user_id = v_auth
+  WHERE id = v_resp.id
+    AND (auth_user_id IS NULL OR auth_user_id = v_auth);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_reenviar_codigo_registro(p_token uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+  v_email text;
+  v_codigo jsonb;
+  v_row public.codigos_ingreso%ROWTYPE;
+BEGIN
+  SELECT * INTO v_row FROM public.codigos_ingreso WHERE token = p_token;
+  IF v_row.id IS NULL THEN
+    RAISE EXCEPTION 'El registro no es válido. Volvé a empezar.';
+  END IF;
+
+  SELECT id, email INTO v_id, v_email
+  FROM public.responsables
+  WHERE id = v_row.id_responsable AND registrado = false;
+
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'Este usuario ya completó el registro';
+  END IF;
+
+  v_codigo := public.fn_emitir_codigo_ingreso(v_id);
+  RETURN jsonb_build_object(
+    'token', v_codigo ->> 'token',
+    'codigo', v_codigo ->> 'codigo',
+    'email', v_email
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_cambiar_email_registro(p_token uuid, p_email text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_email text := lower(btrim(COALESCE(p_email, '')));
+  v_row public.codigos_ingreso%ROWTYPE;
+  v_resp public.responsables%ROWTYPE;
+  v_codigo jsonb;
+BEGIN
+  IF v_email = '' OR position('@' in v_email) = 0 THEN
+    RAISE EXCEPTION 'Ingresá un email válido';
+  END IF;
+
+  SELECT * INTO v_row FROM public.codigos_ingreso WHERE token = p_token;
+  IF v_row.id IS NULL THEN
+    RAISE EXCEPTION 'El registro no es válido. Volvé a empezar.';
+  END IF;
+
+  SELECT * INTO v_resp
+  FROM public.responsables
+  WHERE id = v_row.id_responsable AND registrado = false;
+
+  IF v_resp.id IS NULL THEN
+    RAISE EXCEPTION 'Este usuario ya completó el registro';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.responsables
+    WHERE lower(email) = v_email AND id <> v_resp.id
+  ) THEN
+    RAISE EXCEPTION 'Ese email ya está en uso';
+  END IF;
+
+  UPDATE public.responsables
+  SET email = v_email
+  WHERE id = v_resp.id;
+
+  IF v_resp.auth_user_id IS NOT NULL THEN
+    UPDATE auth.users
+    SET email = v_email,
+        updated_at = now()
+    WHERE id = v_resp.auth_user_id;
+  END IF;
+
+  v_codigo := public.fn_emitir_codigo_ingreso(v_resp.id);
+  RETURN jsonb_build_object(
+    'token', v_codigo ->> 'token',
+    'codigo', v_codigo ->> 'codigo',
+    'email', v_email
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_confirmar_codigo_registro(p_token uuid, p_codigo text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row public.codigos_ingreso%ROWTYPE;
+  v_resp public.responsables%ROWTYPE;
+  v_codigo text := btrim(COALESCE(p_codigo, ''));
+  v_hash text;
+BEGIN
+  IF v_codigo !~ '^\d{6}$' THEN
+    RAISE EXCEPTION 'El código debe tener 6 dígitos';
+  END IF;
+
+  SELECT * INTO v_row FROM public.codigos_ingreso WHERE token = p_token;
+  IF v_row.id IS NULL THEN
+    RAISE EXCEPTION 'El registro no es válido. Volvé a empezar.';
+  END IF;
+
+  SELECT * INTO v_resp FROM public.responsables WHERE id = v_row.id_responsable;
+  IF v_resp.id IS NULL OR v_resp.registrado THEN
+    RAISE EXCEPTION 'Este usuario ya completó el registro';
+  END IF;
+
+  IF v_row.expires_at < now() THEN
+    RAISE EXCEPTION 'El código venció. Pedí uno nuevo.';
+  END IF;
+
+  IF v_row.intentos >= 5 THEN
+    RAISE EXCEPTION 'Demasiados intentos. Pedí un código nuevo.';
+  END IF;
+
+  v_hash := public.fn_hash_codigo_ingreso(v_codigo, v_row.token);
+  IF v_hash IS DISTINCT FROM v_row.codigo_hash THEN
+    UPDATE public.codigos_ingreso
+    SET intentos = intentos + 1
+    WHERE id = v_row.id;
+    RAISE EXCEPTION 'El código no es correcto';
+  END IF;
+
+  UPDATE public.responsables
+  SET registrado = true,
+      registrado_en = now()
+  WHERE id = v_resp.id;
+
+  IF v_resp.auth_user_id IS NOT NULL THEN
+    UPDATE auth.users
+    SET email_confirmed_at = COALESCE(email_confirmed_at, now()),
+        updated_at = now()
+    WHERE id = v_resp.auth_user_id;
+  END IF;
+
+  DELETE FROM public.codigos_ingreso WHERE id_responsable = v_resp.id;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Bienvenida',
+    format('Bienvenido %s %s a Gestión de Stock.', v_resp.nombre, v_resp.apellido),
+    'responsables',
+    v_resp.id,
+    v_resp.id,
+    v_resp.id
+  );
+
+  RETURN jsonb_build_object('ok', true, 'dni', v_resp.dni);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_depositos_activos_registro() TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_iniciar_registro(text, text, text, text, text, uuid[]) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_vincular_auth_registro(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_reenviar_codigo_registro(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_cambiar_email_registro(uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_confirmar_codigo_registro(uuid, text) TO anon;
+
+DROP FUNCTION IF EXISTS public.rpc_solicitar_recuperacion(text);
+
+CREATE OR REPLACE FUNCTION public.rpc_buscar_recuperacion(p_dni text)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_dni text := regexp_replace(COALESCE(p_dni, ''), '\D', '', 'g');
+  v_resp public.responsables%ROWTYPE;
+BEGIN
+  IF v_dni = '' THEN
+    RAISE EXCEPTION 'Completá el DNI.';
+  END IF;
+
+  SELECT * INTO v_resp
+  FROM public.responsables
+  WHERE dni = v_dni
+    AND estado = 'activo'
+    AND registrado = true
+  LIMIT 1;
+
+  IF v_resp.id IS NULL OR v_resp.auth_user_id IS NULL THEN
+    RAISE EXCEPTION 'No encontramos un usuario activo con ese DNI.';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'found', true,
+    'email', v_resp.email,
+    'nombre', btrim(concat_ws(' ', v_resp.nombre, v_resp.apellido)),
+    'dni', v_resp.dni
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_solicitar_recuperacion(p_dni text, p_email text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_dni text := regexp_replace(COALESCE(p_dni, ''), '\D', '', 'g');
+  v_email text := lower(btrim(COALESCE(p_email, '')));
+  v_resp public.responsables%ROWTYPE;
+  v_token uuid := gen_random_uuid();
+  v_email_changed boolean := false;
+BEGIN
+  IF v_dni = '' THEN
+    RAISE EXCEPTION 'Completá el DNI.';
+  END IF;
+
+  IF v_email = '' OR position('@' in v_email) = 0 THEN
+    RAISE EXCEPTION 'Ingresá un email válido';
+  END IF;
+
+  SELECT * INTO v_resp
+  FROM public.responsables
+  WHERE dni = v_dni
+    AND estado = 'activo'
+    AND registrado = true
+  LIMIT 1;
+
+  IF v_resp.id IS NULL OR v_resp.auth_user_id IS NULL THEN
+    RAISE EXCEPTION 'No encontramos un usuario activo con ese DNI.';
+  END IF;
+
+  IF lower(v_resp.email) <> v_email THEN
+    IF EXISTS (
+      SELECT 1 FROM public.responsables
+      WHERE lower(email) = v_email AND id <> v_resp.id
+    ) THEN
+      RAISE EXCEPTION 'Ese email ya está en uso';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM auth.users
+      WHERE lower(email) = v_email AND id <> v_resp.auth_user_id
+    ) THEN
+      RAISE EXCEPTION 'Ese email ya está en uso';
+    END IF;
+
+    UPDATE public.responsables
+    SET email = v_email,
+        updated_at = now()
+    WHERE id = v_resp.id;
+
+    UPDATE auth.users
+    SET email = v_email,
+        updated_at = now()
+    WHERE id = v_resp.auth_user_id;
+
+    v_resp.email := v_email;
+    v_email_changed := true;
+  END IF;
+
+  INSERT INTO public.tokens_recuperacion (id_responsable, token, expires_at)
+  VALUES (v_resp.id, v_token, now() + interval '30 minutes')
+  ON CONFLICT (id_responsable) DO UPDATE
+    SET token = EXCLUDED.token,
+        expires_at = EXCLUDED.expires_at,
+        created_at = now();
+
+  PERFORM public.fn_insertar_notificacion(
+    'Recuperacion_Contrasena',
+    format(
+      CASE
+        WHEN v_email_changed THEN
+          'Se actualizó el mail y se envió la recuperación de %s %s (DNI %s) a %s.'
+        ELSE
+          'Se envió el mail para recuperar la contraseña de %s %s (DNI %s) a %s.'
+      END,
+      v_resp.nombre,
+      v_resp.apellido,
+      v_resp.dni,
+      v_resp.email
+    ),
+    'responsables',
+    v_resp.id,
+    v_resp.id,
+    v_resp.id
+  );
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'found', true,
+    'token', v_token,
+    'email', v_resp.email,
+    'email_changed', v_email_changed,
+    'nombre', btrim(concat_ws(' ', v_resp.nombre, v_resp.apellido)),
+    'dni', v_resp.dni
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_confirmar_recuperacion(p_token uuid, p_password text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_row public.tokens_recuperacion%ROWTYPE;
+  v_resp public.responsables%ROWTYPE;
+  v_password text := COALESCE(p_password, '');
+BEGIN
+  IF length(v_password) < 8
+     OR v_password !~ '[A-Z]'
+     OR v_password !~ '[0-9]' THEN
+    RAISE EXCEPTION 'La contraseña debe tener mínimo 8 caracteres, una mayúscula y un número';
+  END IF;
+
+  SELECT * INTO v_row
+  FROM public.tokens_recuperacion
+  WHERE token = p_token;
+
+  IF v_row.id IS NULL THEN
+    RAISE EXCEPTION 'El enlace no es válido. Pedí recuperar la contraseña de nuevo.';
+  END IF;
+
+  IF v_row.expires_at < now() THEN
+    DELETE FROM public.tokens_recuperacion WHERE id = v_row.id;
+    RAISE EXCEPTION 'El enlace venció. Pedí recuperar la contraseña de nuevo.';
+  END IF;
+
+  SELECT * INTO v_resp
+  FROM public.responsables
+  WHERE id = v_row.id_responsable
+    AND estado = 'activo'
+    AND registrado = true;
+
+  IF v_resp.id IS NULL OR v_resp.auth_user_id IS NULL THEN
+    RAISE EXCEPTION 'El usuario no puede recuperar la contraseña';
+  END IF;
+
+  UPDATE auth.users
+  SET encrypted_password = crypt(v_password, gen_salt('bf')),
+      updated_at = now()
+  WHERE id = v_resp.auth_user_id;
+
+  UPDATE public.responsables
+  SET updated_at = now()
+  WHERE id = v_resp.id;
+
+  DELETE FROM public.tokens_recuperacion WHERE id = v_row.id;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Ingreso_Plataforma',
+    format('%s %s creó una nueva contraseña.', v_resp.nombre, v_resp.apellido),
+    'responsables',
+    v_resp.id,
+    v_resp.id,
+    v_resp.id
+  );
+
+  RETURN jsonb_build_object('ok', true, 'dni', v_resp.dni);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_buscar_recuperacion(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_solicitar_recuperacion(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_confirmar_recuperacion(uuid, text) TO anon;
 
 -- Eventos de Auth/EmailJS que no pasan por tablas maestras.
 CREATE OR REPLACE FUNCTION public.rpc_registrar_evento_auth(
@@ -1012,31 +2025,47 @@ GRANT EXECUTE ON FUNCTION public.rpc_crear_movimiento(
   smallint, uuid, uuid, uuid, boolean, text, text, text[], jsonb
 ) TO authenticated;
 
--- Borrado lógico de familia: inactiva grupos y deja artículos sin grupo.
+-- Borrado definitivo de familia: borra sus grupos. Los artículos quedan sin grupo
+-- (ON DELETE SET NULL en articulos.id_grupo). El estado se edita aparte.
 CREATE OR REPLACE FUNCTION public.rpc_eliminar_familia(p_familia uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_codigo text;
+  v_desc text;
 BEGIN
   IF NOT public.fn_es_administrador() THEN
     RAISE EXCEPTION 'Solo un administrador puede eliminar familias';
   END IF;
 
-  UPDATE public.articulos a
-  SET id_grupo = NULL
-  WHERE a.id_grupo IN (SELECT g.id FROM public.grupos g WHERE g.id_familia = p_familia);
+  SELECT f.codigo, f.descripcion
+  INTO v_codigo, v_desc
+  FROM public.familias f
+  WHERE f.id = p_familia;
 
-  UPDATE public.grupos
-  SET estado = 'inactivo'
-  WHERE id_familia = p_familia
-    AND estado = 'activo';
+  IF v_codigo IS NULL THEN
+    RAISE EXCEPTION 'La familia no existe';
+  END IF;
 
-  UPDATE public.familias
-  SET estado = 'inactivo'
-  WHERE id = p_familia
-    AND estado = 'activo';
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  DELETE FROM public.grupos
+  WHERE id_familia = p_familia;
+
+  DELETE FROM public.familias
+  WHERE id = p_familia;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Eliminacion',
+    format('Se eliminó la familia %s – %s y sus grupos. Los artículos quedaron sin grupo.', v_codigo, v_desc),
+    'familias',
+    p_familia,
+    public.fn_responsable_id_actual(),
+    NULL
+  );
 END;
 $$;
 
@@ -1048,23 +2077,610 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_codigo text;
+  v_desc text;
 BEGIN
   IF NOT public.fn_es_administrador() THEN
     RAISE EXCEPTION 'Solo un administrador puede eliminar grupos';
   END IF;
 
-  UPDATE public.articulos
-  SET id_grupo = NULL
-  WHERE id_grupo = p_grupo;
+  SELECT g.codigo, g.descripcion
+  INTO v_codigo, v_desc
+  FROM public.grupos g
+  WHERE g.id = p_grupo;
 
-  UPDATE public.grupos
-  SET estado = 'inactivo'
-  WHERE id = p_grupo
-    AND estado = 'activo';
+  IF v_codigo IS NULL THEN
+    RAISE EXCEPTION 'El grupo no existe';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  DELETE FROM public.grupos
+  WHERE id = p_grupo;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Eliminacion',
+    format('Se eliminó el grupo %s – %s. Los artículos quedaron sin grupo.', v_codigo, v_desc),
+    'grupos',
+    p_grupo,
+    public.fn_responsable_id_actual(),
+    NULL
+  );
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_eliminar_grupo(uuid) TO authenticated;
+
+-- Movimientos: si el proveedor se borra o queda inactivo, queda sin proveedor.
+DO $$
+DECLARE
+  v_name text;
+BEGIN
+  SELECT c.conname INTO v_name
+  FROM pg_constraint c
+  WHERE c.conrelid = 'public.movimientos'::regclass
+    AND c.confrelid = 'public.proveedores'::regclass
+    AND c.contype = 'f'
+  LIMIT 1;
+
+  IF v_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.movimientos DROP CONSTRAINT %I', v_name);
+  END IF;
+
+  ALTER TABLE public.movimientos
+    ADD CONSTRAINT movimientos_id_proveedor_fkey
+    FOREIGN KEY (id_proveedor) REFERENCES public.proveedores (id) ON DELETE SET NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.fn_trg_desvincular_proveedor_inactivo()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.estado = 'inactivo' AND OLD.estado IS DISTINCT FROM NEW.estado THEN
+    UPDATE public.movimientos
+    SET id_proveedor = NULL
+    WHERE id_proveedor = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_proveedores_desvincular_inactivo ON public.proveedores;
+CREATE TRIGGER trg_proveedores_desvincular_inactivo
+  AFTER UPDATE OF estado ON public.proveedores
+  FOR EACH ROW EXECUTE FUNCTION public.fn_trg_desvincular_proveedor_inactivo();
+
+CREATE OR REPLACE FUNCTION public.rpc_eliminar_proveedor(p_proveedor uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_codigo text;
+  v_razon text;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede eliminar proveedores';
+  END IF;
+
+  SELECT p.cod_proveedor, p.razon_social
+  INTO v_codigo, v_razon
+  FROM public.proveedores p
+  WHERE p.id = p_proveedor;
+
+  IF v_codigo IS NULL THEN
+    RAISE EXCEPTION 'El proveedor no existe';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  UPDATE public.movimientos
+  SET id_proveedor = NULL
+  WHERE id_proveedor = p_proveedor;
+
+  DELETE FROM public.proveedores
+  WHERE id = p_proveedor;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Eliminacion',
+    format('Se eliminó el proveedor %s – %s. Quedó desvinculado de los movimientos.', v_codigo, v_razon),
+    'proveedores',
+    p_proveedor,
+    public.fn_responsable_id_actual(),
+    NULL
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_eliminar_proveedor(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_eliminar_deposito(p_deposito uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_codigo text;
+  v_nombre text;
+  v_cant integer;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede eliminar depósitos';
+  END IF;
+
+  SELECT d.codigo, d.nombre, d.cant_articulos
+  INTO v_codigo, v_nombre, v_cant
+  FROM public.depositos d
+  WHERE d.id = p_deposito;
+
+  IF v_codigo IS NULL THEN
+    RAISE EXCEPTION 'El depósito no existe';
+  END IF;
+
+  IF COALESCE(v_cant, 0) > 0 THEN
+    RAISE EXCEPTION 'No se puede eliminar: todavía hay artículos en este depósito. Transferilos primero.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.movimientos m
+    WHERE m.id_deposito_origen = p_deposito
+       OR m.id_deposito_destino = p_deposito
+  ) THEN
+    RAISE EXCEPTION 'No se puede eliminar: hay movimientos en el historial. Poné el estado en Inactivo para no usarlo en movimientos nuevos.';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  DELETE FROM public.inventario_depositos
+  WHERE id_deposito = p_deposito
+    AND cantidad_actual = 0;
+
+  DELETE FROM public.depositos
+  WHERE id = p_deposito;
+
+  PERFORM public.fn_insertar_notificacion(
+    'Eliminacion',
+    format('Se eliminó el depósito %s – %s.', v_codigo, v_nombre),
+    'depositos',
+    p_deposito,
+    public.fn_responsable_id_actual(),
+    NULL
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_eliminar_deposito(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_asignar_articulos_grupo(
+  p_grupo uuid,
+  p_articulos uuid[]
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_removed integer := 0;
+  v_assigned integer := 0;
+  v_ids uuid[] := COALESCE(p_articulos, ARRAY[]::uuid[]);
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede asignar artículos a un grupo';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.grupos
+    WHERE id = p_grupo
+  ) THEN
+    RAISE EXCEPTION 'El grupo no existe';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  UPDATE public.articulos
+  SET id_grupo = NULL
+  WHERE id_grupo = p_grupo
+    AND NOT (id = ANY (v_ids));
+  GET DIAGNOSTICS v_removed = ROW_COUNT;
+
+  UPDATE public.articulos
+  SET id_grupo = p_grupo
+  WHERE id = ANY (v_ids)
+    AND (id_grupo IS DISTINCT FROM p_grupo);
+  GET DIAGNOSTICS v_assigned = ROW_COUNT;
+
+  RETURN jsonb_build_object(
+    'assigned', v_assigned,
+    'removed', v_removed
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_asignar_articulos_grupo(uuid, uuid[]) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_asignar_responsables_deposito(
+  p_deposito uuid,
+  p_responsables uuid[]
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_codigo text;
+  v_nombre text;
+  v_ids uuid[];
+  v_antes uuid[] := ARRAY[]::uuid[];
+  v_persona uuid;
+  v_nombre_persona text;
+  v_removed integer := 0;
+  v_assigned integer := 0;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede asignar responsables a un depósito';
+  END IF;
+
+  SELECT d.codigo, d.nombre
+  INTO v_codigo, v_nombre
+  FROM public.depositos d
+  WHERE d.id = p_deposito;
+
+  IF v_codigo IS NULL THEN
+    RAISE EXCEPTION 'El depósito no existe';
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT x), ARRAY[]::uuid[])
+  INTO v_ids
+  FROM unnest(COALESCE(p_responsables, ARRAY[]::uuid[])) AS x
+  WHERE x IS NOT NULL;
+
+  SELECT COALESCE(array_agg(dr.id_responsable), ARRAY[]::uuid[])
+  INTO v_antes
+  FROM public.depositos_responsables dr
+  WHERE dr.id_deposito = p_deposito;
+
+  DELETE FROM public.depositos_responsables dr
+  WHERE dr.id_deposito = p_deposito
+    AND NOT (dr.id_responsable = ANY (v_ids));
+
+  INSERT INTO public.depositos_responsables (id_deposito, id_responsable)
+  SELECT p_deposito, u.id_responsable
+  FROM unnest(v_ids) AS u(id_responsable)
+  ON CONFLICT (id_deposito, id_responsable) DO NOTHING;
+
+  FOREACH v_persona IN ARRAY v_ids
+  LOOP
+    IF NOT (v_persona = ANY (v_antes)) THEN
+      v_assigned := v_assigned + 1;
+      v_nombre_persona := COALESCE(public.fn_nombre_responsable(v_persona), 'un responsable');
+      PERFORM public.fn_insertar_notificacion(
+        'Asignacion_Responsable',
+        format(
+          'Se asignó a %s como responsable del depósito %s – %s.',
+          v_nombre_persona,
+          v_codigo,
+          v_nombre
+        ),
+        'depositos',
+        p_deposito,
+        public.fn_responsable_id_actual(),
+        v_persona,
+        jsonb_build_object(
+          'id_deposito', p_deposito,
+          'id_responsable_asignado', v_persona
+        )
+      );
+    END IF;
+  END LOOP;
+
+  FOREACH v_persona IN ARRAY v_antes
+  LOOP
+    IF NOT (v_persona = ANY (v_ids)) THEN
+      v_removed := v_removed + 1;
+      v_nombre_persona := COALESCE(public.fn_nombre_responsable(v_persona), 'un responsable');
+      PERFORM public.fn_insertar_notificacion(
+        'Desvinculacion_Responsable',
+        format(
+          'Se desvinculó a %s del depósito %s – %s.',
+          v_nombre_persona,
+          v_codigo,
+          v_nombre
+        ),
+        'depositos',
+        p_deposito,
+        public.fn_responsable_id_actual(),
+        v_persona,
+        jsonb_build_object(
+          'id_deposito', p_deposito,
+          'id_responsable_desvinculado', v_persona
+        )
+      );
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'assigned', v_assigned,
+    'removed', v_removed
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_asignar_responsables_deposito(uuid, uuid[]) TO authenticated;
+
+-- Código único: mismo código + mismos datos = no tocar.
+-- Código nuevo = alta. Misma razón distinta = update (no reactiva inactivos).
+CREATE OR REPLACE FUNCTION public.rpc_upsert_proveedores_masivo(p_filas jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_created integer := 0;
+  v_updated integer := 0;
+  v_unchanged integer := 0;
+  v_row jsonb;
+  v_cod text;
+  v_razon text;
+  v_id uuid;
+  v_razon_actual text;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede hacer carga masiva';
+  END IF;
+
+  IF p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' OR jsonb_array_length(p_filas) = 0 THEN
+    RAISE EXCEPTION 'No hay filas para cargar';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  FOR v_row IN SELECT value FROM jsonb_array_elements(p_filas)
+  LOOP
+    v_cod := btrim(COALESCE(v_row ->> 'cod_proveedor', ''));
+    v_razon := btrim(COALESCE(v_row ->> 'razon_social', ''));
+    IF v_cod = '' OR v_razon = '' THEN
+      RAISE EXCEPTION 'Hay filas incompletas en la carga masiva de proveedores';
+    END IF;
+
+    SELECT p.id, btrim(p.razon_social)
+    INTO v_id, v_razon_actual
+    FROM public.proveedores p
+    WHERE lower(p.cod_proveedor) = lower(v_cod);
+
+    IF v_id IS NULL THEN
+      INSERT INTO public.proveedores (cod_proveedor, razon_social, estado)
+      VALUES (v_cod, v_razon, 'activo');
+      v_created := v_created + 1;
+    ELSIF v_razon_actual IS DISTINCT FROM v_razon THEN
+      UPDATE public.proveedores
+      SET razon_social = v_razon
+      WHERE id = v_id;
+      v_updated := v_updated + 1;
+    ELSE
+      v_unchanged := v_unchanged + 1;
+    END IF;
+  END LOOP;
+
+  IF v_created + v_updated > 0 THEN
+    PERFORM public.fn_insertar_notificacion(
+      'Carga_Masiva',
+      format(
+        'Carga masiva de proveedores: %s creados y %s editados.',
+        v_created,
+        v_updated
+      ),
+      'proveedores',
+      NULL,
+      public.fn_responsable_id_actual(),
+      NULL,
+      jsonb_build_object(
+        'tabla', 'proveedores',
+        'creados', v_created,
+        'editados', v_updated,
+        'sin_cambios', v_unchanged,
+        'total', v_created + v_updated + v_unchanged
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'created', v_created,
+    'updated', v_updated,
+    'unchanged', v_unchanged,
+    'total', v_created + v_updated + v_unchanged
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_upsert_proveedores_masivo(jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_upsert_depositos_masivo(p_filas jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_created integer := 0;
+  v_updated integer := 0;
+  v_unchanged integer := 0;
+  v_row jsonb;
+  v_cod text;
+  v_nombre text;
+  v_ubicacion text;
+  v_id uuid;
+  v_nombre_actual text;
+  v_ubicacion_actual text;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede hacer carga masiva';
+  END IF;
+
+  IF p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' OR jsonb_array_length(p_filas) = 0 THEN
+    RAISE EXCEPTION 'No hay filas para cargar';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  FOR v_row IN SELECT value FROM jsonb_array_elements(p_filas)
+  LOOP
+    v_cod := btrim(COALESCE(v_row ->> 'codigo', ''));
+    v_nombre := btrim(COALESCE(v_row ->> 'nombre', ''));
+    v_ubicacion := btrim(COALESCE(v_row ->> 'ubicacion', ''));
+    IF v_cod = '' OR v_nombre = '' OR v_ubicacion = '' THEN
+      RAISE EXCEPTION 'Hay filas incompletas en la carga masiva de depósitos';
+    END IF;
+
+    SELECT d.id, btrim(d.nombre), btrim(d.ubicacion)
+    INTO v_id, v_nombre_actual, v_ubicacion_actual
+    FROM public.depositos d
+    WHERE lower(d.codigo) = lower(v_cod);
+
+    IF v_id IS NULL THEN
+      INSERT INTO public.depositos (codigo, nombre, ubicacion, estado)
+      VALUES (v_cod, v_nombre, v_ubicacion, 'activo');
+      v_created := v_created + 1;
+    ELSIF v_nombre_actual IS DISTINCT FROM v_nombre
+       OR v_ubicacion_actual IS DISTINCT FROM v_ubicacion THEN
+      UPDATE public.depositos
+      SET nombre = v_nombre,
+          ubicacion = v_ubicacion
+      WHERE id = v_id;
+      v_updated := v_updated + 1;
+    ELSE
+      v_unchanged := v_unchanged + 1;
+    END IF;
+  END LOOP;
+
+  IF v_created + v_updated > 0 THEN
+    PERFORM public.fn_insertar_notificacion(
+      'Carga_Masiva',
+      format(
+        'Carga masiva de depósitos: %s creados y %s editados.',
+        v_created,
+        v_updated
+      ),
+      'depositos',
+      NULL,
+      public.fn_responsable_id_actual(),
+      NULL,
+      jsonb_build_object(
+        'tabla', 'depositos',
+        'creados', v_created,
+        'editados', v_updated,
+        'sin_cambios', v_unchanged,
+        'total', v_created + v_updated + v_unchanged
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'created', v_created,
+    'updated', v_updated,
+    'unchanged', v_unchanged,
+    'total', v_created + v_updated + v_unchanged
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_upsert_depositos_masivo(jsonb) TO authenticated;
+
+-- Código único por familia: mismo código + mismos datos = no tocar.
+-- Código nuevo = alta. Mismo código con descripción distinta = update (no reactiva).
+CREATE OR REPLACE FUNCTION public.rpc_upsert_grupos_masivo(p_filas jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_created integer := 0;
+  v_updated integer := 0;
+  v_unchanged integer := 0;
+  v_row jsonb;
+  v_familia uuid;
+  v_cod text;
+  v_desc text;
+  v_id uuid;
+  v_desc_actual text;
+  v_counts jsonb := '{}'::jsonb;
+  v_key text;
+  v_n integer;
+BEGIN
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede hacer carga masiva';
+  END IF;
+
+  IF p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' OR jsonb_array_length(p_filas) = 0 THEN
+    RAISE EXCEPTION 'No hay filas para cargar';
+  END IF;
+
+  PERFORM set_config('app.carga_masiva', '1', true);
+
+  FOR v_row IN SELECT value FROM jsonb_array_elements(p_filas)
+  LOOP
+    v_familia := (v_row ->> 'id_familia')::uuid;
+    v_cod := btrim(COALESCE(v_row ->> 'codigo', ''));
+    v_desc := btrim(COALESCE(v_row ->> 'descripcion', ''));
+    IF v_familia IS NULL OR v_cod = '' OR v_desc = '' THEN
+      RAISE EXCEPTION 'Hay filas incompletas en la carga masiva de grupos';
+    END IF;
+
+    SELECT g.id, btrim(g.descripcion)
+    INTO v_id, v_desc_actual
+    FROM public.grupos g
+    WHERE g.id_familia = v_familia
+      AND lower(g.codigo) = lower(v_cod);
+
+    IF v_id IS NULL THEN
+      INSERT INTO public.grupos (id_familia, codigo, descripcion, estado)
+      VALUES (v_familia, v_cod, v_desc, 'activo');
+      v_created := v_created + 1;
+      v_key := v_familia::text;
+      v_n := COALESCE((v_counts ->> v_key)::integer, 0) + 1;
+      v_counts := jsonb_set(v_counts, ARRAY[v_key], to_jsonb(v_n));
+    ELSIF v_desc_actual IS DISTINCT FROM v_desc THEN
+      UPDATE public.grupos
+      SET descripcion = v_desc
+      WHERE id = v_id;
+      v_updated := v_updated + 1;
+    ELSE
+      v_unchanged := v_unchanged + 1;
+    END IF;
+  END LOOP;
+
+  FOR v_key, v_n IN
+    SELECT key, (value #>> '{}')::integer
+    FROM jsonb_each(v_counts)
+  LOOP
+    PERFORM public.fn_notificar_alta_grupos_familia(
+      v_key::uuid,
+      v_n,
+      jsonb_build_object('origen', 'carga_masiva')
+    );
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'created', v_created,
+    'updated', v_updated,
+    'unchanged', v_unchanged,
+    'total', v_created + v_updated + v_unchanged
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_upsert_grupos_masivo(jsonb) TO authenticated;
 
 -- -----------------------------------------------------------------------------
 -- VISTAS DE CONSULTA
@@ -1088,7 +2704,7 @@ SELECT
   f.codigo,
   f.descripcion,
   f.estado,
-  COUNT(DISTINCT g.id) FILTER (WHERE g.estado = 'activo') AS cant_grupos,
+  COUNT(DISTINCT g.id) AS cant_grupos,
   COUNT(DISTINCT a.id) FILTER (WHERE a.estado = 'activo') AS cant_articulos,
   COALESCE(SUM(public.fn_costo_actual_articulo(a.id)) FILTER (WHERE a.estado = 'activo'), 0) AS costo_total
 FROM public.familias f
@@ -1113,13 +2729,45 @@ ALTER VIEW public.v_articulos_costo_actual SET (security_invoker = true);
 ALTER VIEW public.v_familias_resumen SET (security_invoker = true);
 ALTER VIEW public.v_grupos_resumen SET (security_invoker = true);
 
+GRANT SELECT ON public.v_articulos_costo_actual TO authenticated;
+GRANT SELECT ON public.v_familias_resumen TO authenticated;
+GRANT SELECT ON public.v_grupos_resumen TO authenticated;
+
+-- PostgREST solo publica tablas/funciones con privilegios para el rol.
+-- Sin esto, INSERT/UPDATE/RPC responden 404 aunque existan y tengan RLS.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.depositos_responsables TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_email_por_dni(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_depositos_activos_registro() TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_iniciar_registro(text, text, text, text, text, uuid[]) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_vincular_auth_registro(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_reenviar_codigo_registro(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_cambiar_email_registro(uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_confirmar_codigo_registro(uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_buscar_recuperacion(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_solicitar_recuperacion(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.rpc_confirmar_recuperacion(uuid, text) TO anon;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO authenticated;
+
 -- -----------------------------------------------------------------------------
 -- ROW LEVEL SECURITY
 -- -----------------------------------------------------------------------------
 ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.responsables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.codigos_ingreso ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tokens_recuperacion ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.proveedores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.depositos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.depositos_responsables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.familias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grupos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.articulos ENABLE ROW LEVEL SECURITY;
@@ -1155,7 +2803,11 @@ CREATE POLICY admin_all_responsables ON public.responsables
 DROP POLICY IF EXISTS self_select_responsable ON public.responsables;
 CREATE POLICY self_select_responsable ON public.responsables
   FOR SELECT TO authenticated
-  USING (auth_user_id = auth.uid() OR public.fn_es_administrador());
+  USING (
+    auth_user_id = auth.uid()
+    OR public.fn_es_administrador()
+    OR public.fn_es_vista_descarga()
+  );
 
 DROP POLICY IF EXISTS self_update_responsable ON public.responsables;
 CREATE POLICY self_update_responsable ON public.responsables
@@ -1185,7 +2837,24 @@ CREATE POLICY propio_deposito_select ON public.depositos
   FOR SELECT TO authenticated
   USING (
     public.fn_es_administrador()
+    OR public.fn_es_vista_descarga()
+    OR id IN (SELECT public.fn_depositos_del_responsable())
+  );
+
+DROP POLICY IF EXISTS admin_all_depositos_responsables ON public.depositos_responsables;
+CREATE POLICY admin_all_depositos_responsables ON public.depositos_responsables
+  FOR ALL TO authenticated
+  USING (public.fn_es_administrador())
+  WITH CHECK (public.fn_es_administrador());
+
+DROP POLICY IF EXISTS depositos_responsables_select ON public.depositos_responsables;
+CREATE POLICY depositos_responsables_select ON public.depositos_responsables
+  FOR SELECT TO authenticated
+  USING (
+    public.fn_es_administrador()
+    OR public.fn_es_vista_descarga()
     OR id_responsable = public.fn_responsable_id_actual()
+    OR id_deposito IN (SELECT public.fn_depositos_del_responsable())
   );
 
 DROP POLICY IF EXISTS admin_all_familias ON public.familias;
@@ -1382,6 +3051,9 @@ CREATE POLICY remitos_update ON storage.objects
 -- -----------------------------------------------------------------------------
 -- REALTIME (campana de notificaciones)
 -- -----------------------------------------------------------------------------
+ALTER TABLE public.notificaciones REPLICA IDENTITY FULL;
+ALTER TABLE public.notificaciones_leidas REPLICA IDENTITY FULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1392,4 +3064,15 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.notificaciones;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'notificaciones_leidas'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notificaciones_leidas;
+  END IF;
 END $$;
+
+NOTIFY pgrst, 'reload schema';

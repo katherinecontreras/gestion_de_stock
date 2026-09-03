@@ -7,7 +7,8 @@
 # testing
 /coverage
 
-# next.js
+# vite
+/dist
 /.next/
 /out/
 
@@ -35,5 +36,4 @@ yarn-error.log*
 # supabase cli
 supabase/.temp/
 
-# typescript
 *.tsbuildinfo
