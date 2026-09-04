@@ -1,6 +1,6 @@
 # Plataforma de Gestión de Stock — Simetra Service SA
 
-Sistema interno para registrar artículos, proveedores y depósitos, asignar responsables y controlar movimientos de stock (entrada, salida y transferencia) entre depósitos.
+Sistema interno para registrar artículos, proveedores y depósitos, asignar responsables y controlar movimientos de stock (entrada, salida, transferencia y **entrega de EPP** a un empleado).
 
 ## Stack tecnológico
 
@@ -33,18 +33,20 @@ gestion-stock/
 ├── supabase/
 │   └── schema.sql
 ├── .env.local.example
+├── .env.production
 └── README.md
 ```
 
 Rutas de la aplicación:
 
 - `/autentication/login`, `/autentication/registro`, `/autentication/recuperar`
-- `/responsables` — administración de responsables (solo Administrador)
-- `/articulos` y `/articulos/:id` — catálogo e historial
+- `/responsables` — administración de responsables (solo Administrador edita)
+- `/articulos` y `/articulos/:id` — catálogo e historial (incluye entregas EPP)
 - `/familias` y `/familias/:id` — familias, grupos y asignación de artículos
 - `/proveedores`
 - `/depositos`
-- `/movimientos`, `/movimientos/nuevo`, `/movimientos/:id`
+- `/movimientos`, `/movimientos/nuevo`, `/movimientos/:id` — listado, alta (entrada, salida, transferencia, entrega EPP) y dos vistas de inventario (artículos y EPP)
+- `/entregas` — historial de entregas EPP por empleado (acordeón + línea de tiempo)
 - `/notificaciones` — historial completo
 
 ## Requisitos previos
@@ -82,9 +84,9 @@ cp .env.local.example .env
 
 1. En Supabase, abrí **SQL Editor**.
 2. Pegá y ejecutá el contenido de `supabase/schema.sql`.
-3. El script crea tablas, enums, índices, RLS, triggers de notificaciones, actualización automática de inventario y RPCs transaccionales.
+3. El script crea tablas, enums, índices, RLS, triggers de notificaciones, actualización de inventario (artículos y EPP) y RPCs transaccionales.
 
-También crea el bucket de Storage `remitos` para las imágenes de remito.
+También crea el bucket de Storage `remitos` para las imágenes de remito (una o más hojas).
 
 ## 4. Desarrollo local
 
@@ -118,21 +120,26 @@ Un push a la rama de producción dispara el deploy automático.
 ## Convenciones de datos
 
 - Identificadores de negocio en `snake_case` (PostgreSQL).
-- Borrado lógico (`estado = inactivo`) en maestros: proveedores, responsables, depósitos, artículos, familias y grupos.
-- Contraseñas solo en **Supabase Auth**; `responsables` se vincula con `auth_user_id`.
-- El login de la app usa DNI: se resuelve el email con `rpc_email_por_dni` y luego `signInWithPassword`.
-- Los movimientos se persisten con `rpc_crear_movimiento` para que el encabezado y el detalle entren en la misma transacción.
+- Borrado lógico (`estado = inactivo`) en maestros con historial: proveedores, responsables, depósitos, artículos.
+- Contraseñas solo en **Supabase Auth**. `responsables.auth_user_id` queda vacío en el rol **Empleado** (tiene mail, no entra a la plataforma).
+- No se usan `registrado`, `invitado_en` ni `registrado_en`. Alcanzan `created_at` y `updated_at`.
+- El login usa DNI: se resuelve el email con `rpc_email_por_dni` y luego `signInWithPassword`. El Empleado no se ofrece en el registro.
+- Los movimientos se persisten con `rpc_crear_movimiento` (encabezado + detalle en la misma transacción).
+- **Entrega EPP:** un movimiento = un empleado, N artículos `is_epp`. Resta stock solo en el origen. El inventario EPP (`inventario_epp_personal`) guarda lo que usa cada empleado; en un recambio se resta la última entrega, se borran artículos que ya no van y se suman los nuevos.
+- `fecha_recambio` = fecha del movimiento + 30 días. Al vencer: notificación `Alerta_Recambio_EPP` y mail al empleado y al responsable que cargó la entrega.
+- `fotos_remito` es un array: el remito puede tener varias hojas.
 
 ## Roles
 
 | Rol | Alcance |
 | --- | --- |
-| Administrador | ABM completo, invitaciones, historial global y notificaciones |
-| Responsable_Deposito | Artículos y movimientos de sus depósitos; puede cargar movimientos |
-| Vista_Consulta | Solo lectura (reservado para asignaciones futuras) |
+| Administrador | ABM completo e historial global. En responsables solo ve, edita y elimina (no crea ni invita). El primero se carga por seed. |
+| Responsable_Deposito | Artículos y movimientos de sus depósitos; puede cargar movimientos, incluida Entrega EPP |
+| Vista_Descarga | Ve y descarga todo (incluye historial de entregas); no escribe |
+| Empleado | Recibe EPP. No inicia sesión. Se busca por nombre (o se crea) al cargar una Entrega EPP |
 
-Las políticas RLS del esquema restringen al responsable de depósito a filas de sus depósitos.
+Las políticas RLS restringen al responsable de depósito a filas de sus depósitos.
 
 ## Estado de esta fase
 
-Fase 1: arquitectura Vite + React, conexión a Supabase y esquema inicial. Las pantallas funcionales se implementan a continuación, módulo por módulo.
+Pantallas de autenticación, familias, proveedores, depósitos y notificaciones en curso. Siguiente módulo: artículos + Entrega EPP (SQL, inventario EPP, historial de entregas y alerta de recambio).
