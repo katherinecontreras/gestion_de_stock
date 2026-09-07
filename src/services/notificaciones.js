@@ -58,6 +58,11 @@ export async function notificarCambioEstadoFamiliaGrupo({ tabla, id, codigo, des
             ? `Se reactivó el depósito ${label}.`
             : `Se inhabilitó el depósito ${label}. Ya no se puede usar en movimientos nuevos. El historial se conserva.`;
     }
+    else if (tabla === "articulos") {
+        texto = estado === "activo"
+            ? `Se reactivó el artículo ${label}.`
+            : `Se inhabilitó el artículo ${label}.`;
+    }
     else {
         texto = estado === "activo"
             ? `Se reactivó el grupo ${label}.`

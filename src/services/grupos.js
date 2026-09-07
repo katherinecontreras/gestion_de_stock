@@ -1,5 +1,4 @@
 import { createBrowserClient } from "@/lib/supabase";
-import { nextCodigoDesdeActivos, nextFamiliaCodigo } from "./familias";
 import { errorText, explainMissingDbFunction } from "./db-errors";
 import { notificarCambioEstadoFamiliaGrupo } from "./notificaciones";
 function normalizeInput(input) {
@@ -9,11 +8,21 @@ function normalizeInput(input) {
         estado: input.estado === "inactivo" ? "inactivo" : "activo",
     };
 }
-export function nextGrupoCodigo(codigos) {
-    return nextFamiliaCodigo(codigos);
+export function prefijoCodigoGrupo(familiaCodigo) {
+    return String(familiaCodigo ?? "").trim();
 }
-export function nextGrupoCodigoDesdeActivos(rows) {
-    return nextCodigoDesdeActivos(rows);
+export function sufijoCodigoGrupo(codigo, familiaCodigo) {
+    const prefix = prefijoCodigoGrupo(familiaCodigo);
+    const value = String(codigo ?? "").trim();
+    if (prefix && value.toLowerCase().startsWith(prefix.toLowerCase())) {
+        return value.slice(prefix.length);
+    }
+    return value;
+}
+export function codigoGrupoCompleto(familiaCodigo, sufijo) {
+    const prefix = prefijoCodigoGrupo(familiaCodigo);
+    const rest = sufijoCodigoGrupo(sufijo, prefix);
+    return `${prefix}${rest}`;
 }
 export function explainGrupoError(errorOrMessage, code) {
     const message = typeof errorOrMessage === "string"

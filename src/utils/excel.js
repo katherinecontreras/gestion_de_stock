@@ -10,7 +10,7 @@ const HEADER_STYLE = {
     alignment: {
         horizontal: "center",
         vertical: "center",
-        wrapText: true,
+        wrapText: false,
     },
     border: {
         top: { style: "thin", color: { rgb: "6BA8D9" } },
@@ -49,12 +49,14 @@ function cellWidth(value) {
 }
 export function fitSheetColumns(rows) {
     const colCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+    const header = rows[0] ?? [];
     return Array.from({ length: colCount }, (_, col) => {
-        let max = 0;
-        for (const row of rows) {
-            max = Math.max(max, cellWidth(row[col]));
+        const headerWidth = Math.ceil(cellWidth(header[col]) * 1.3) + 4;
+        let dataWidth = 0;
+        for (let index = 1; index < rows.length; index += 1) {
+            dataWidth = Math.max(dataWidth, cellWidth(rows[index][col]));
         }
-        return { wch: Math.max(max + 2, 8) };
+        return { wch: Math.max(headerWidth, dataWidth + 2, 10) };
     });
 }
 function columnLetter(index) {

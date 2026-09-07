@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { TableAppearRow, TableGhost, TableShell } from "@/components/ui/table";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { useToast } from "@/app/layouts/ToastProvider";
-import { asignarArticulosGrupo, createGrupo, eliminarGrupo, explainGrupoError, getFamiliaDetalle, listArticulosAsignacion, listGrupoCodigos, listGruposResumen, nextGrupoCodigoDesdeActivos, updateGrupo, } from "@/services/grupos";
+import { asignarArticulosGrupo, codigoGrupoCompleto, createGrupo, eliminarGrupo, explainGrupoError, getFamiliaDetalle, listArticulosAsignacion, listGrupoCodigos, listGruposResumen, prefijoCodigoGrupo, updateGrupo, } from "@/services/grupos";
 import { formatCurrency, formatFamiliaGrupo } from "@/utils/format";
 import { SPA_PATHS } from "@/utils/routes";
 function SortButton({ label, active, dir, align = "left", onClick, }) {
@@ -96,13 +96,15 @@ export function FamiliaDetalleScreen() {
             cancelled = true;
         };
     }, [id, isAdmin, perfilLoading, notify]);
-    const suggestedCode = useMemo(() => nextGrupoCodigoDesdeActivos(codigos), [codigos]);
+    const familiaCodigo = familia?.codigo ?? "";
+    const codigoPrefijo = prefijoCodigoGrupo(familiaCodigo);
+    const createCodigoCompleto = codigoGrupoCompleto(codigoPrefijo, createCode);
     const createCodeOwner = useMemo(() => {
-        const code = createCode.trim().toLowerCase();
-        if (!code)
+        const code = createCodigoCompleto.trim().toLowerCase();
+        if (!codigoPrefijo || !createCode.trim())
             return null;
         return codigos.find((row) => row.codigo.toLowerCase() === code) ?? null;
-    }, [createCode, codigos]);
+    }, [createCodigoCompleto, createCode, codigoPrefijo, codigos]);
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase();
         const list = term
@@ -142,7 +144,7 @@ export function FamiliaDetalleScreen() {
             : { key, dir: key === "codigo" ? "asc" : "desc" });
     }
     function openCreate() {
-        setCreateCode(suggestedCode);
+        setCreateCode("");
         setCreateName("");
         setCreateError(null);
         setCreateOpen(true);
@@ -156,7 +158,7 @@ export function FamiliaDetalleScreen() {
         setSaving(true);
         setCreateError(null);
         try {
-            await createGrupo(id, { codigo: createCode, descripcion: createName });
+            await createGrupo(id, { codigo: createCodigoCompleto, descripcion: createName });
             setCreateOpen(false);
             await reload();
             notify("Grupo creado.", "success");
@@ -401,11 +403,11 @@ export function FamiliaDetalleScreen() {
           </table>) : null}
       </TableShell>
 
-      <FormModal open={createOpen} title="Cargar grupo" description="El código se sugiere en correlativo de tres dígitos dentro de esta familia. Podés cambiarlo." onClose={() => !saving && setCreateOpen(false)} footer={<>
+      <FormModal open={createOpen} title="Cargar grupo" description="El código empieza con el de la familia. Solo escribí el texto del grupo." onClose={() => !saving && setCreateOpen(false)} footer={<>
             <Button variant="secondary" disabled={saving} onClick={() => setCreateOpen(false)}>
               Cancelar
             </Button>
-            <Button form="create-grupo" type="submit" disabled={saving || Boolean(createCodeOwner)}>
+            <Button form="create-grupo" type="submit" disabled={saving || Boolean(createCodeOwner) || !createCode.trim()}>
               {saving ? <Spinner className="h-4 w-4 text-white"/> : null}
               Guardar
             </Button>
@@ -414,7 +416,7 @@ export function FamiliaDetalleScreen() {
           {createError ? <Alert>{createError}</Alert> : null}
           {createCodeOwner?.estado === "inactivo" ? (<div className="rounded-control border border-app-input bg-app-subtle px-3 py-3 text-sm text-app-secondarytext">
               <p>
-                Ya existe un grupo con el código “{createCode.trim()}” (inactivo: {createCodeOwner.descripcion}). Si querés usar ese código, reactivá ese grupo o eliminalo. Si no, cambiá el código.
+                Ya existe un grupo con el código “{createCodigoCompleto}” (inactivo: {createCodeOwner.descripcion}). Si querés usar ese código, reactivá ese grupo o eliminalo. Si no, cambiá el texto.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button" disabled={saving} onClick={() => void handleReactivar(createCodeOwner)}>
@@ -425,11 +427,27 @@ export function FamiliaDetalleScreen() {
                 </Button>
               </div>
             </div>) : createCodeOwner ? (<Alert>
-              Ya existe un grupo con el código “{createCode.trim()}” ({createCodeOwner.descripcion}).
+              Ya existe un grupo con el código “{createCodigoCompleto}” ({createCodeOwner.descripcion}).
             </Alert>) : null}
-          <Input label="Código" value={createCode} maxLength={20} onChange={(event) => setCreateCode(event.target.value)} required hint={<span className="text-xs text-app-mutedtext">
-                Sugerido: {suggestedCode}
-              </span>}/>
+          <label className="flex w-full flex-col gap-1.5">
+            <span className="text-sm font-medium text-app-secondarytext">Código</span>
+            <div className="flex overflow-hidden rounded-control border border-app-input focus-within:border-app-focus focus-within:ring-1 focus-within:ring-app-focus">
+              <span className="flex items-center bg-app-muted px-3 font-mono text-sm font-semibold text-app-secondarytext">
+                {codigoPrefijo || "—"}
+              </span>
+              <input
+                value={createCode}
+                maxLength={Math.max(1, 20 - codigoPrefijo.length)}
+                onChange={(event) => setCreateCode(event.target.value.toUpperCase())}
+                required
+                placeholder="CORC"
+                className="min-w-0 flex-1 border-0 bg-app-surface px-3 py-2 font-mono text-sm text-app-primary placeholder:text-app-faint focus:outline-none focus:ring-0"
+              />
+            </div>
+            <span className="text-xs text-app-mutedtext">
+              Queda: {createCode.trim() ? createCodigoCompleto : codigoPrefijo || "—"}
+            </span>
+          </label>
           <Input label="Descripción" value={createName} maxLength={255} onChange={(event) => setCreateName(event.target.value)} required/>
         </form>
       </FormModal>

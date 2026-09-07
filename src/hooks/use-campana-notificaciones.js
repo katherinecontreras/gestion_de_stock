@@ -115,7 +115,7 @@ async function etiquetasCreacion(supabase, rows) {
 }
 function cuerpoNotificacion(row, etiquetas, actor) {
     const base = textoSinActor(row.descripcion, actor);
-    if (esAltaGruposFamilia(base)) {
+    if (esAltaGruposFamilia(base) || /^Se creó /i.test(base)) {
         return base;
     }
     if (embedTipo(row.tipos_notificacion)?.tipo !== "Creacion") {

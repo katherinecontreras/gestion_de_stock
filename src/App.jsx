@@ -111,6 +111,7 @@ function RoleGate() {
   const allowed =
     pathname === SPA_PATHS.articulos
     || pathname.startsWith(`${SPA_PATHS.articulos}/`)
+    || pathname === SPA_PATHS.depositos
     || pathname === SPA_PATHS.movimientos
     || pathname.startsWith(`${SPA_PATHS.movimientos}/`);
 

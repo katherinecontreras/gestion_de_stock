@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, ChevronsUpDown, Download, Pencil, Plus, Search, Trash2, Upload, Users, X, } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, ChevronsUpDown, Download, Package, Pencil, Plus, Search, Trash2, Upload, Users, X, } from "lucide-react";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { FormModal } from "@/components/modals/form-modal";
 import { Alert } from "@/components/ui/alert";
@@ -11,7 +11,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { TableAppearRow, TableGhost, TableShell } from "@/components/ui/table";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { useToast } from "@/app/layouts/ToastProvider";
-import { asignarResponsablesDeposito, createDeposito, eliminarDeposito, explainDepositoError, listDepositos, listResponsablesOpciones, nextDepositoCodigoDesdeActivos, updateDeposito, upsertDepositos, } from "@/services/depositos";
+import { InventarioDepositoModal } from "@/components/modules/inventarios-panels";
+import { asignarResponsablesDeposito, createDeposito, eliminarDeposito, explainDepositoError, listDepositos, listDepositosPropios, listResponsablesOpciones, nextDepositoCodigoDesdeActivos, updateDeposito, upsertDepositos, } from "@/services/depositos";
 import { downloadDepositosExcel, parseDepositosExcel } from "@/utils/excel-depositos";
 import { formatCurrency } from "@/utils/format";
 
@@ -27,7 +28,9 @@ export function DepositosScreen() {
     const { perfil, loading: perfilLoading } = usePerfilSesion();
     const { notify } = useToast();
     const isAdmin = Boolean(perfil?.esAdministrador);
-    const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
+    const isResponsable = Boolean(perfil?.esResponsableDeposito) && !isAdmin;
+    const canView = isAdmin || Boolean(perfil?.esVistaDescarga) || isResponsable;
+    const canDownload = isAdmin || Boolean(perfil?.esVistaDescarga);
     const [rows, setRows] = useState([]);
     const [responsables, setResponsables] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -49,10 +52,11 @@ export function DepositosScreen() {
     const [gestionar, setGestionar] = useState(null);
     const [gestionarSearch, setGestionarSearch] = useState("");
     const [selectedResponsables, setSelectedResponsables] = useState(() => new Set());
+    const [inventario, setInventario] = useState(null);
 
     async function reload() {
         const [depositos, opciones] = await Promise.all([
-            listDepositos(),
+            isResponsable ? listDepositosPropios() : listDepositos(),
             isAdmin ? listResponsablesOpciones() : Promise.resolve([]),
         ]);
         setRows(depositos);
@@ -81,7 +85,7 @@ export function DepositosScreen() {
         return () => {
             cancelled = true;
         };
-    }, [canView, isAdmin, perfilLoading, notify]);
+    }, [canView, isAdmin, isResponsable, perfilLoading, notify]);
 
     const suggestedCode = useMemo(() => nextDepositoCodigoDesdeActivos(rows), [rows]);
 
@@ -362,19 +366,23 @@ export function DepositosScreen() {
 
     if (!canView) {
         return (<section>
-        <PageHeader title="Depósitos" description="La gestión de depósitos está reservada al rol Administrador."/>
-        <Alert>Tu usuario no puede cargar, editar ni eliminar depósitos.</Alert>
+        <PageHeader title="Depósitos" description="No tenés permiso para ver depósitos."/>
+        <Alert>Tu usuario no puede ver depósitos.</Alert>
       </section>);
     }
 
     return (<section>
       <PageHeader title="Depósitos" description={isAdmin
             ? "Código, ubicación y responsables. La cantidad de artículos y el costo se calculan solos. El estado se cambia con Editar. Los responsables se asignan con Gestionar responsables."
-            : "Consulta y descarga de depósitos. No se pueden crear, editar ni asignar responsables."} actions={<>
+            : isResponsable
+                ? "Tus depósitos asignados, con cantidad de artículos, costo total e inventario."
+                : "Consulta y descarga de depósitos. No se pueden crear, editar ni asignar responsables."} actions={<>
+            {canDownload ? (
             <Button variant="secondary" className="w-full lg:w-auto" onClick={handleDownload} disabled={loading}>
               <Download size={18} strokeWidth={1.6}/>
               Descargar Excel
             </Button>
+            ) : null}
             {isAdmin ? (<>
                 <Button variant="secondary" className="w-full lg:w-auto" onClick={() => {
                     setUploadError(null);
@@ -399,6 +407,8 @@ export function DepositosScreen() {
             : filtered.length === 0
                 ? search.trim()
                     ? "No hay depósitos que coincidan con la búsqueda."
+                    : isResponsable
+                    ? "No tenés depósitos asignados."
                     : "Todavía no hay depósitos."
                 : undefined}>
         {loading ? (<TableGhost minWidth="64rem" columns={[
@@ -434,7 +444,7 @@ export function DepositosScreen() {
                 <th className="px-4 py-3 text-right">
                   <SortButton label="Costo total" active={sort.key === "costo_total"} dir={sort.dir} align="right" onClick={() => toggleSort("costo_total")}/>
                 </th>
-                {isAdmin ? <th className="px-4 py-3 text-right font-semibold">Acciones</th> : null}
+                <th className="px-4 py-3 text-right font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -462,7 +472,7 @@ export function DepositosScreen() {
                     <td className="px-4 py-3 text-right tabular-nums">
                       {formatCurrency(Number(row.costo_total ?? 0))}
                     </td>
-                    {isAdmin ? (<td className="px-4 py-3">
+                    <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         {editing ? (<>
                             <Button variant="table" aria-label="Guardar" disabled={saving} onClick={() => void handleSaveDraft()}>
@@ -472,6 +482,11 @@ export function DepositosScreen() {
                               <X size={18} strokeWidth={1.7}/>
                             </Button>
                           </>) : (<>
+                            <Button variant="table" className="px-2" aria-label={`Ver inventario de ${row.nombre}`} disabled={Boolean(draft)} onClick={() => setInventario(row)}>
+                              <Package size={18} strokeWidth={1.7}/>
+                              <span className="text-xs font-medium">Inventario</span>
+                            </Button>
+                            {isAdmin ? (<>
                             <Button variant="table" className="px-2" aria-label={`Gestionar responsables de ${row.nombre}`} disabled={Boolean(draft)} onClick={() => void openGestionar(row)}>
                               <Users size={18} strokeWidth={1.7}/>
                               <span className="text-xs font-medium">Gestionar</span>
@@ -488,9 +503,10 @@ export function DepositosScreen() {
                             <Button variant="table" aria-label={`Eliminar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => setToDelete(row)}>
                               <Trash2 size={18} strokeWidth={1.7}/>
                             </Button>
+                            </>) : null}
                           </>)}
                       </div>
-                    </td>) : null}
+                    </td>
                   </TableAppearRow>);
             })}
             </tbody>
@@ -607,8 +623,17 @@ export function DepositosScreen() {
         </div>
       </FormModal>
 
-      <ConfirmDialog open={Boolean(toDelete)} title="Eliminar depósito" description={toDelete
-            ? `Si eliminás “${toDelete.nombre}”, se borra de forma permanente y se quitan las asignaciones de responsables. No hay vuelta atrás. Solo se puede si no tiene stock ni movimientos. Si ya se usó, inactivalo con Editar: no se podrá usar en movimientos nuevos y el historial se conserva.`
-            : ""} pending={saving} onConfirm={() => void handleDelete()} onClose={() => !saving && setToDelete(null)}/>
+      {inventario ? <InventarioDepositoModal deposito={inventario} onClose={() => setInventario(null)} /> : null}
+
+      <ConfirmDialog
+        open={Boolean(toDelete)}
+        title="Eliminar depósito"
+        description={toDelete
+          ? `Si eliminás “${toDelete.nombre}”, se borra de forma permanente y se quitan las asignaciones de responsables. No hay vuelta atrás. Solo se puede si no tiene stock ni movimientos. Si ya se usó, inactivalo con Editar: no se podrá usar en movimientos nuevos y el historial se conserva.`
+          : ""}
+        pending={saving}
+        onConfirm={() => void handleDelete()}
+        onClose={() => !saving && setToDelete(null)}
+      />
     </section>);
 }

@@ -19,13 +19,13 @@ export function useAuth() {
             }
             const { data } = await supabase
                 .from("responsables")
-                .select("registrado")
+                .select("id")
                 .eq("auth_user_id", user.id)
                 .maybeSingle();
             setState({
                 user,
                 loading: false,
-                registrado: data?.registrado !== false,
+                registrado: Boolean(data),
             });
         }
 

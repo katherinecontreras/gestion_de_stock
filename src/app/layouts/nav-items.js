@@ -8,5 +8,7 @@ export const NAV_ITEMS = [
     { href: SPA_PATHS.movimientos, label: "Movimientos", icon: ArrowLeftRight },
 ];
 export const RESPONSABLE_NAV_ITEMS = NAV_ITEMS.filter((item) => (
-    item.href === SPA_PATHS.articulos || item.href === SPA_PATHS.movimientos
+    item.href === SPA_PATHS.articulos
+    || item.href === SPA_PATHS.depositos
+    || item.href === SPA_PATHS.movimientos
 ));

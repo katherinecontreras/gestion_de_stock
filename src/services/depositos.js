@@ -103,6 +103,32 @@ export async function listDepositosActivos() {
     return (data ?? []).map(mapDeposito);
 }
 
+export async function listDepositosPropios() {
+    const supabase = createBrowserClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return [];
+    const { data: responsable, error: respError } = await supabase
+        .from("responsables")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .maybeSingle();
+    if (respError) throw respError;
+    if (!responsable) return [];
+    const { data, error } = await supabase
+        .from("depositos_responsables")
+        .select(`depositos:id_deposito (${DEPOSITO_SELECT})`)
+        .eq("id_responsable", responsable.id);
+    if (error) throw error;
+    return (data ?? [])
+        .map((row) => {
+            const dep = Array.isArray(row.depositos) ? row.depositos[0] : row.depositos;
+            return dep ? mapDeposito(dep) : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
+}
+
 export async function listResponsablesOpciones() {
     const supabase = createBrowserClient();
     const { data, error } = await supabase
