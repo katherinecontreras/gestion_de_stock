@@ -33,6 +33,8 @@ export function ProveedoresScreen() {
     const [dragging, setDragging] = useState(false);
     const fileInputRef = useRef(null);
     const isAdmin = Boolean(perfil?.esAdministrador);
+    const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
+    const canWrite = isAdmin;
 
     async function reload() {
         const data = await listProveedores();
@@ -42,7 +44,7 @@ export function ProveedoresScreen() {
     useEffect(() => {
         if (perfilLoading)
             return;
-        if (!isAdmin) {
+        if (!canView) {
             setLoading(false);
             return;
         }
@@ -59,7 +61,7 @@ export function ProveedoresScreen() {
         return () => {
             cancelled = true;
         };
-    }, [isAdmin, perfilLoading, notify]);
+    }, [canView, perfilLoading, notify]);
 
     const suggestedCode = useMemo(() => nextProveedorCodigoDesdeActivos(rows), [rows]);
 
@@ -266,31 +268,35 @@ export function ProveedoresScreen() {
       </div>);
     }
 
-    if (!isAdmin) {
+    if (!canView) {
         return (<section>
         <PageHeader title="Proveedores" description="La gestión de proveedores está reservada al rol Administrador."/>
-        <Alert>Tu usuario no puede cargar, editar ni eliminar proveedores.</Alert>
+        <Alert>Tu usuario no puede ver proveedores.</Alert>
       </section>);
     }
 
     return (<section>
-      <PageHeader title="Proveedores" description="Alta y edición. El estado se cambia con Editar. Eliminar es definitivo: el proveedor queda desvinculado de los movimientos." actions={<>
+      <PageHeader title="Proveedores" description={canWrite
+            ? "Alta y edición. El estado se cambia con Editar. Eliminar es definitivo: el proveedor queda desvinculado de los movimientos."
+            : "Solo lectura y descarga. No se puede cargar, editar ni eliminar."} actions={<>
             <Button variant="secondary" className="w-full lg:w-auto" onClick={handleDownload} disabled={loading}>
               <Download size={18} strokeWidth={1.6}/>
               Descargar Excel
             </Button>
-            <Button variant="secondary" className="w-full lg:w-auto" onClick={() => {
+            {canWrite ? (<>
+                <Button variant="secondary" className="w-full lg:w-auto" onClick={() => {
                 setUploadError(null);
                 setUploadFile(null);
                 setUploadOpen(true);
             }}>
-              <Upload size={18} strokeWidth={1.6}/>
-              Carga masiva
-            </Button>
-            <Button className="w-full lg:w-auto" onClick={openCreate}>
-              <Plus size={18} strokeWidth={1.6}/>
-              Cargar nuevo proveedor
-            </Button>
+                  <Upload size={18} strokeWidth={1.6}/>
+                  Carga masiva
+                </Button>
+                <Button className="w-full lg:w-auto" onClick={openCreate}>
+                  <Plus size={18} strokeWidth={1.6}/>
+                  Cargar nuevo proveedor
+                </Button>
+              </>) : null}
           </>}/>
 
       <TableShell toolbar={<label className="relative block max-w-md">
@@ -333,7 +339,7 @@ export function ProveedoresScreen() {
                       {editing ? (<EstadoSelect value={draft.estado} onChange={(estado) => setDraft({ ...draft, estado })}/>) : (<EstadoBadge estado={row.estado}/>)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
+                      {canWrite ? (<div className="flex justify-end gap-1">
                         {editing ? (<>
                             <Button variant="table" aria-label="Guardar" disabled={saving} onClick={() => void handleSaveEdit()}>
                               <Check size={18} strokeWidth={1.7}/>
@@ -354,7 +360,7 @@ export function ProveedoresScreen() {
                               <Trash2 size={18} strokeWidth={1.7}/>
                             </Button>
                           </>)}
-                      </div>
+                      </div>) : <span className="block text-right text-app-faint">—</span>}
                     </td>
                   </TableAppearRow>);
             })}

@@ -1,4 +1,3 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder";
 export { ArticulosScreen } from "@/components/modules/articulos-screen";
 export { ArticuloHistorialScreen } from "@/components/modules/articulo-historial-screen";
 export { FamiliasScreen } from "@/components/modules/familias-screen";
@@ -8,7 +7,6 @@ export { DepositosScreen } from "@/components/modules/depositos-screen";
 export { MovimientosScreen } from "@/components/modules/movimientos-screen";
 export { MovimientoDetalleScreen } from "@/components/modules/movimiento-detalle-screen";
 export { NuevoMovimientoScreen } from "@/components/modules/nuevo-movimiento-screen";
-export function ResponsablesScreen() {
-    return (<PagePlaceholder title="Administración de responsables" description="Alta, edición, baja lógica, invitación y recuperación de contraseña. Solo rol Administrador."/>);
-}
+export { EntregasEppScreen } from "@/components/modules/entregas-epp-screen";
+export { ResponsablesScreen } from "@/components/modules/responsables-screen";
 export { NotificacionesScreen } from "@/components/modules/notificaciones-screen";

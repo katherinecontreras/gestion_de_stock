@@ -1,6 +1,6 @@
 import { APP_ROUTES } from "@/utils/routes";
 
-const PRODUCCION_VERCEL = "https://gestion-de-stock.vercel.app";
+const PRODUCCION_VERCEL = "https://gestion-de-stock-woad.vercel.app";
 
 function clean(value) {
   return String(value ?? "")

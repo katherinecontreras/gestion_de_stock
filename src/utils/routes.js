@@ -10,6 +10,7 @@ export const SPA_PATHS = {
   movimientos: "/movimientos",
   movimientoNuevo: "/movimientos/nuevo",
   movimientoDetalle: (id) => `/movimientos/${id}`,
+  entregas: "/entregas",
   responsables: "/responsables",
   notificaciones: "/notificaciones",
 };
@@ -28,6 +29,7 @@ export const APP_ROUTES = {
   movimientos: SPA_PATHS.movimientos,
   movimientoNuevo: SPA_PATHS.movimientoNuevo,
   movimientoDetalle: SPA_PATHS.movimientoDetalle,
+  entregas: SPA_PATHS.entregas,
   responsables: SPA_PATHS.responsables,
   notificaciones: SPA_PATHS.notificaciones,
 };

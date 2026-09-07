@@ -42,7 +42,7 @@ export function usePerfilSesion() {
             }
             const { data } = await supabase
                 .from("responsables")
-                .select("nombre, apellido, dni, email, estado, roles ( tipo )")
+                .select("id, nombre, apellido, dni, email, estado, roles ( tipo )")
                 .eq("auth_user_id", user.id)
                 .eq("estado", "activo")
                 .maybeSingle();
@@ -56,6 +56,7 @@ export function usePerfilSesion() {
             const rolEmbed = data.roles;
             const tipo = Array.isArray(rolEmbed) ? rolEmbed[0]?.tipo : rolEmbed?.tipo;
             setPerfil({
+                id: data.id,
                 nombre: data.nombre,
                 apellido: data.apellido,
                 nombreCompleto: `${data.nombre} ${data.apellido}`.trim(),

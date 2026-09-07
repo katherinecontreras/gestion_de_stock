@@ -91,6 +91,20 @@ export async function listDepositos() {
     return (data ?? []).map(mapDeposito);
 }
 
+export async function listDepositosParaAsignacion() {
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase.rpc("rpc_depositos_activos_registro", {});
+    if (error)
+        throw error;
+    return (data ?? []).map((row) => ({
+        id: row.id,
+        codigo: row.codigo ?? "",
+        nombre: row.nombre ?? "",
+        ubicacion: row.ubicacion ?? "",
+        estado: "activo",
+    }));
+}
+
 export async function listDepositosActivos() {
     const supabase = createBrowserClient();
     const { data, error } = await supabase
@@ -226,6 +240,16 @@ export async function upsertDepositos(inputs) {
         created,
         unchanged,
     };
+}
+
+export async function actualizarMisDepositos(idsDepositos) {
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase.rpc("rpc_actualizar_mis_depositos", {
+        p_depositos: idsDepositos,
+    });
+    if (error)
+        throw error;
+    return data ?? { assigned: 0, removed: 0 };
 }
 
 export async function asignarResponsablesDeposito(idDeposito, idsResponsables) {

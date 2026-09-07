@@ -1,5 +1,6 @@
-import { User } from "lucide-react";
+import { User, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { FloatingPanel } from "./floating-panel";
 function Field({ label, value }) {
@@ -10,8 +11,9 @@ function Field({ label, value }) {
       <p className="truncate text-sm text-app-primary">{value}</p>
     </div>);
 }
-export function PerfilMenu({ open, onOpen, onClose }) {
+export function PerfilMenu({ open, onOpen, onClose, onAdministrarDepositos }) {
     const { perfil, loading } = usePerfilSesion();
+    const puedeDepositos = Boolean(perfil?.esResponsableDeposito) && !perfil?.esAdministrador && !perfil?.esVistaDescarga;
     return (<div onMouseEnter={onOpen} onMouseLeave={onClose}>
       <FloatingPanel open={open} onClose={onClose} labelledBy="perfil-menu-trigger" panelClassName="w-80" trigger={<button type="button" id="perfil-menu-trigger" aria-label="Perfil" aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-app-secondary text-white transition-colors duration-hover hover:opacity-90">
             <User size={18} strokeWidth={1.6}/>
@@ -42,6 +44,21 @@ export function PerfilMenu({ open, onOpen, onClose }) {
             <Field label="Nombre completo" value={perfil.nombreCompleto}/>
             <Field label="DNI" value={perfil.dni}/>
             <Field label="Email" value={perfil.email}/>
+            {puedeDepositos && onAdministrarDepositos ? (
+              <div className="border-t border-app-border-subtle p-3">
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => {
+                    onClose();
+                    onAdministrarDepositos();
+                  }}
+                >
+                  <Warehouse size={16} strokeWidth={1.6} />
+                  Administrar depósitos
+                </Button>
+              </div>
+            ) : null}
           </>) : null}
       </FloatingPanel>
     </div>);

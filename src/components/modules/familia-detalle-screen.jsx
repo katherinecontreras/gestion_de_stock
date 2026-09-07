@@ -62,6 +62,8 @@ export function FamiliaDetalleScreen() {
     const [selectedArticulos, setSelectedArticulos] = useState(new Set());
     const [articuloSearch, setArticuloSearch] = useState("");
     const isAdmin = Boolean(perfil?.esAdministrador);
+    const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
+    const canWrite = isAdmin;
     async function reload() {
         if (!id)
             return;
@@ -77,7 +79,7 @@ export function FamiliaDetalleScreen() {
     useEffect(() => {
         if (perfilLoading)
             return;
-        if (!isAdmin || !id) {
+        if (!canView || !id) {
             setLoading(false);
             return;
         }
@@ -95,7 +97,7 @@ export function FamiliaDetalleScreen() {
         return () => {
             cancelled = true;
         };
-    }, [id, isAdmin, perfilLoading, notify]);
+    }, [id, canView, perfilLoading, notify]);
     const familiaCodigo = familia?.codigo ?? "";
     const codigoPrefijo = prefijoCodigoGrupo(familiaCodigo);
     const createCodigoCompleto = codigoGrupoCompleto(codigoPrefijo, createCode);
@@ -284,9 +286,9 @@ export function FamiliaDetalleScreen() {
             setSaving(false);
         }
     }
-    if (!perfilLoading && !isAdmin) {
+    if (!perfilLoading && !canView) {
         return (<div>
-        <PageHeader title="Gestionar grupos y artículos" description="La gestión de grupos está reservada al rol Administrador."/>
+        <PageHeader title="Grupos y artículos" description="Esta página está reservada al administrador y a vista y descarga."/>
       </div>);
     }
     if (!perfilLoading && !loading && !familia) {
@@ -301,18 +303,20 @@ export function FamiliaDetalleScreen() {
         ? formatFamiliaGrupo(familia.codigo, familia.descripcion)
         : "";
     return (<div>
-      <PageHeader title="Gestionar grupos y artículos" description={familia
+      <PageHeader title={canWrite ? "Gestionar grupos y artículos" : "Grupos de la familia"} description={familia
             ? `Familia ${familiaLabel}. Cantidad de artículos y costo se calculan solos.`
-            : "Detalle de la familia, sus grupos y la asignación de artículos."} actions={isAdmin ? (<>
+            : "Detalle de la familia y sus grupos."} actions={<>
               <Button variant="secondary" className="w-full lg:w-auto" onClick={() => navigate(SPA_PATHS.familias)}>
                 <ArrowLeft size={18} strokeWidth={1.6}/>
                 Familias
               </Button>
+              {canWrite ? (
               <Button className="w-full lg:w-auto" onClick={openCreate} disabled={!familia}>
                 <Plus size={18} strokeWidth={1.6}/>
                 Cargar grupo
               </Button>
-            </>) : null}/>
+              ) : null}
+            </>}/>
 
       <TableShell toolbar={<div className="relative max-w-sm">
             <Search size={16} strokeWidth={1.7} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-faint"/>
@@ -370,7 +374,7 @@ export function FamiliaDetalleScreen() {
                       {formatCurrency(Number(row.costo_total ?? 0))}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
+                      {canWrite ? (<div className="flex justify-end gap-1">
                         {editing ? (<>
                             <Button variant="table" aria-label="Guardar" disabled={saving} onClick={() => void handleSaveDraft()}>
                               <Check size={18} strokeWidth={1.7}/>
@@ -395,7 +399,7 @@ export function FamiliaDetalleScreen() {
                               <Trash2 size={18} strokeWidth={1.7}/>
                             </Button>
                           </>)}
-                      </div>
+                      </div>) : <span className="block text-right text-app-faint">—</span>}
                     </td>
                   </TableAppearRow>);
             })}

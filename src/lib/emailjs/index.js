@@ -1,1 +1,1 @@
-export { emailjsConfig, isEmailJsConfigured, isEmailJsRecuperarConfigured, sendCodigoIngreso, sendRecuperarContrasena } from "./client";
+export { emailjsConfig, isEmailJsConfigured, isEmailJsRecambioConfigured, isEmailJsRecuperarConfigured, sendAlertaRecambioEpp, sendCodigoIngreso, sendRecuperarContrasena, } from "./client";

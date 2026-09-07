@@ -113,7 +113,7 @@ El `.env` local **no** viaja al deploy. El build de producción lee `.env.produc
 2. **Build Command:** `npm run build`
 3. **Output Directory:** `dist`
 
-Los enlaces de los mails (recuperar contraseña) siempre usan `NEXT_PUBLIC_APP_URL` (`https://gestion-de-stock.vercel.app`), nunca localhost.
+Los enlaces de los mails (recuperar contraseña) siempre usan `NEXT_PUBLIC_APP_URL` (`https://gestion-de-stock-woad.vercel.app`), nunca localhost.
 
 Un push a la rama de producción dispara el deploy automático.
 

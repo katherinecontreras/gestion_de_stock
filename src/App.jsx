@@ -16,6 +16,7 @@ import {
   ArticuloHistorialScreen,
   ArticulosScreen,
   DepositosScreen,
+  EntregasEppScreen,
   FamiliaDetalleScreen,
   FamiliasScreen,
   MovimientoDetalleScreen,
@@ -113,7 +114,8 @@ function RoleGate() {
     || pathname.startsWith(`${SPA_PATHS.articulos}/`)
     || pathname === SPA_PATHS.depositos
     || pathname === SPA_PATHS.movimientos
-    || pathname.startsWith(`${SPA_PATHS.movimientos}/`);
+    || pathname.startsWith(`${SPA_PATHS.movimientos}/`)
+    || pathname === SPA_PATHS.entregas;
 
   if (!allowed) return <Navigate to={SPA_PATHS.articulos} replace />;
   return <Outlet />;
@@ -172,6 +174,7 @@ export default function App() {
                 <Route path={SPA_PATHS.movimientos} element={<MovimientosScreen />} />
                 <Route path={SPA_PATHS.movimientoNuevo} element={<NuevoMovimientoScreen />} />
                 <Route path="/movimientos/:id" element={<MovimientoDetalleScreen />} />
+                <Route path={SPA_PATHS.entregas} element={<EntregasEppScreen />} />
                 <Route path={SPA_PATHS.responsables} element={<ResponsablesScreen />} />
                 <Route path={SPA_PATHS.notificaciones} element={<NotificacionesScreen />} />
               </Route>

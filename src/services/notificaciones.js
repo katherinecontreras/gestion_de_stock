@@ -96,6 +96,8 @@ const ACCION_TIPOS = {
     Carga_Masiva: ["Carga_Masiva"],
     Reactivacion: ["Reactivacion"],
     Inhabilitacion: ["Inhabilitacion"],
+    Alerta_Recambio_EPP: ["Alerta_Recambio_EPP"],
+    Peticion_Depositos: ["Peticion_Depositos"],
 };
 const TABLA_VALORES = {
     responsables: ["responsables"],

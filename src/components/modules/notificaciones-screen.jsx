@@ -24,6 +24,8 @@ const ACCION_OPTIONS = [
     { value: "Carga_Masiva", label: "Carga masiva" },
     { value: "Reactivacion", label: "Reactivación" },
     { value: "Inhabilitacion", label: "Inhabilitación" },
+    { value: "Alerta_Recambio_EPP", label: "Alerta de recambio EPP" },
+    { value: "Peticion_Depositos", label: "Pedido de depósitos" },
 ];
 const TABLA_OPTIONS = [
     { value: "", label: "Todas las tablas" },
@@ -56,6 +58,8 @@ const ACCION_TONE = {
     Carga_Masiva: "neutral",
     Reactivacion: "ok",
     Inhabilitacion: "warning",
+    Alerta_Recambio_EPP: "warning",
+    Peticion_Depositos: "assign",
 };
 function toneAccion(tipo) {
     if (tipo && tipo in ACCION_TONE)
@@ -77,6 +81,7 @@ export function NotificacionesScreen() {
     const { perfil, loading: perfilLoading } = usePerfilSesion();
     const { notify } = useToast();
     const isAdmin = Boolean(perfil?.esAdministrador);
+    const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
     const [searchInput, setSearchInput] = useState("");
     const [filtros, setFiltros] = useState({
         search: "",
@@ -101,7 +106,7 @@ export function NotificacionesScreen() {
     useEffect(() => {
         if (perfilLoading)
             return;
-        if (!isAdmin) {
+        if (!canView) {
             setLoading(false);
             return;
         }
@@ -126,10 +131,10 @@ export function NotificacionesScreen() {
         return () => {
             cancelled = true;
         };
-    }, [filtros, page, isAdmin, perfilLoading, notify]);
-    if (!perfilLoading && !isAdmin) {
+    }, [filtros, page, canView, perfilLoading, notify]);
+    if (!perfilLoading && !canView) {
         return (<div>
-        <PageHeader title="Historial de notificaciones" description="El historial de auditoría está reservado al rol Administrador."/>
+        <PageHeader title="Historial de notificaciones" description="El historial de auditoría está reservado al administrador y a vista y descarga."/>
       </div>);
     }
     const pageCount = Math.max(1, Math.ceil(total / NOTIF_PAGE_SIZE));

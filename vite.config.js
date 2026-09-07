@@ -28,7 +28,7 @@ function publicAppUrl(env = {}) {
   if (explicit && !/localhost|127\.0\.0\.1/i.test(explicit)) {
     return explicit.replace(/\/$/, "");
   }
-  return "https://gestion-de-stock.vercel.app";
+  return "https://gestion-de-stock-woad.vercel.app";
 }
 
 export default defineConfig(({ mode }) => {

@@ -1,6 +1,7 @@
 export { ArticuloHistorialScreen } from "./articulo-historial-screen";
 export { ArticulosScreen } from "./articulos-screen";
 export { DepositosScreen } from "./depositos-screen";
+export { EntregasEppScreen } from "./entregas-epp-screen";
 export { FamiliaDetalleScreen } from "./familia-detalle-screen";
 export { FamiliasScreen } from "./familias-screen";
 export { MovimientoDetalleScreen } from "./movimiento-detalle-screen";
@@ -8,3 +9,4 @@ export { MovimientosScreen } from "./movimientos-screen";
 export { NotificacionesScreen } from "./notificaciones-screen";
 export { NuevoMovimientoScreen } from "./nuevo-movimiento-screen";
 export { ProveedoresScreen } from "./proveedores-screen";
+export { ResponsablesScreen } from "./responsables-screen";

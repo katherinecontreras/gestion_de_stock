@@ -46,6 +46,8 @@ export function FamiliasScreen() {
     const [dragging, setDragging] = useState(false);
     const fileInputRef = useRef(null);
     const isAdmin = Boolean(perfil?.esAdministrador);
+    const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
+    const canWrite = isAdmin;
     async function reload() {
         const [resumen, allCodes] = await Promise.all([
             listFamiliasResumen(),
@@ -57,7 +59,7 @@ export function FamiliasScreen() {
     useEffect(() => {
         if (perfilLoading)
             return;
-        if (!isAdmin) {
+        if (!canView) {
             setLoading(false);
             return;
         }
@@ -74,7 +76,7 @@ export function FamiliasScreen() {
         return () => {
             cancelled = true;
         };
-    }, [isAdmin, perfilLoading, notify]);
+    }, [canView, perfilLoading, notify]);
     const suggestedCode = useMemo(() => nextCodigoDesdeActivos(codigos), [codigos]);
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase();
@@ -338,27 +340,31 @@ export function FamiliasScreen() {
         <Spinner />
       </div>);
     }
-    if (!isAdmin) {
+    if (!canView) {
         return (<section>
         <PageHeader title="Familias / Grupos" description="La gestión de familias y grupos está reservada al rol Administrador."/>
-        <Alert>Tu usuario no puede cargar, editar ni eliminar familias.</Alert>
+        <Alert>Tu usuario no puede ver familias.</Alert>
       </section>);
     }
     const allSelected = rows.length > 0 && selectedIds.size === rows.length;
     return (<section>
-      <PageHeader title="Familias / Grupos" description="Alta y edición de familias. La cantidad de grupos, artículos y el costo se calculan solos." actions={<>
+      <PageHeader title="Familias / Grupos" description={canWrite
+            ? "Alta y edición de familias. La cantidad de grupos, artículos y el costo se calculan solos."
+            : "Solo lectura y descarga. La cantidad de grupos, artículos y el costo se calculan solos."} actions={<>
             <Button variant="secondary" className="w-full lg:w-auto" onClick={() => openExcel("download")} disabled={loading}>
               <Download size={18} strokeWidth={1.6}/>
               Descargar
             </Button>
-            <Button variant="secondary" className="w-full lg:w-auto" onClick={() => openExcel("upload")} disabled={loading || rows.length === 0}>
-              <Upload size={18} strokeWidth={1.6}/>
-              Cargar
-            </Button>
-            <Button className="w-full lg:w-auto" onClick={openCreate}>
-              <Plus size={18} strokeWidth={1.6}/>
-              Cargar nueva familia
-            </Button>
+            {canWrite ? (<>
+                <Button variant="secondary" className="w-full lg:w-auto" onClick={() => openExcel("upload")} disabled={loading || rows.length === 0}>
+                  <Upload size={18} strokeWidth={1.6}/>
+                  Cargar
+                </Button>
+                <Button className="w-full lg:w-auto" onClick={openCreate}>
+                  <Plus size={18} strokeWidth={1.6}/>
+                  Cargar nueva familia
+                </Button>
+              </>) : null}
           </>}/>
 
       <TableShell toolbar={<label className="relative block max-w-md">
@@ -437,20 +443,22 @@ export function FamiliasScreen() {
                               <X size={18} strokeWidth={1.7}/>
                             </Button>
                           </>) : (<>
-                            <Button variant="table" aria-label={`Editar ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => setDraft({
+                            {canWrite ? (<>
+                                <Button variant="table" aria-label={`Editar ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => setDraft({
                             id: row.id,
                             codigo: row.codigo,
                             descripcion: row.descripcion,
                             estado: row.estado,
                         })}>
-                              <Pencil size={18} strokeWidth={1.7}/>
-                            </Button>
-                            <Button variant="table" aria-label={`Eliminar ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => setToDelete(row)}>
-                              <Trash2 size={18} strokeWidth={1.7}/>
-                            </Button>
-                            <Button variant="table" className="px-2" aria-label={`Gestionar grupos y artículos de ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => navigate(SPA_PATHS.familiaDetalle(row.id))}>
+                                  <Pencil size={18} strokeWidth={1.7}/>
+                                </Button>
+                                <Button variant="table" aria-label={`Eliminar ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => setToDelete(row)}>
+                                  <Trash2 size={18} strokeWidth={1.7}/>
+                                </Button>
+                              </>) : null}
+                            <Button variant="table" className="px-2" aria-label={`${canWrite ? "Gestionar" : "Ver"} grupos y artículos de ${row.descripcion}`} disabled={Boolean(draft)} onClick={() => navigate(SPA_PATHS.familiaDetalle(row.id))}>
                               <FolderKanban size={18} strokeWidth={1.7}/>
-                              <span className="text-xs font-medium">Gestionar</span>
+                              <span className="text-xs font-medium">{canWrite ? "Gestionar" : "Ver grupos"}</span>
                             </Button>
                           </>)}
                       </div>

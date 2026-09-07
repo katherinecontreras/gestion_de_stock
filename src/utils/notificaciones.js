@@ -13,6 +13,8 @@ const ACCION_LABEL = {
     Carga_Masiva: "Carga masiva",
     Reactivacion: "Reactivación",
     Inhabilitacion: "Inhabilitación",
+    Alerta_Recambio_EPP: "Alerta de recambio EPP",
+    Peticion_Depositos: "Pedido de depósitos",
 };
 const TABLA_LABEL = {
     articulos: "Artículos",

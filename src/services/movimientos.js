@@ -133,7 +133,7 @@ export function explainMovimientoError(errorOrMessage) {
         return message;
     }
     if (/PGRST202|rpc_crear_movimiento|Could not find the function/i.test(message)) {
-        return "Falta la RPC nueva (un solo parámetro jsonb). Pegá supabase/rpc-crear-movimiento.sql en el SQL Editor.";
+        return "Falta la RPC de movimiento en la base. Revisá supabase/schema.sql y pegá la función rpc_crear_movimiento en el SQL Editor.";
     }
     if (/empleados/i.test(message) && (errorOrMessage?.code === "42501" || /permission denied|row-level security|403/i.test(message))) {
         return "No tenés permiso para buscar o cargar empleados. Pegá en el SQL Editor el ajuste de empleados.";
@@ -281,6 +281,59 @@ export async function listMovimientosPagina({
         rows: (result.data ?? []).map(mapMovimiento),
         total: result.count ?? 0,
     };
+}
+
+export async function listEntregasEpp() {
+    const supabase = createBrowserClient();
+    const { data: tipoRow, error: tipoError } = await supabase
+        .from("tipos_movimiento")
+        .select("id")
+        .eq("tipo", "Entrega_EPP")
+        .maybeSingle();
+    if (tipoError) throw tipoError;
+    if (!tipoRow) return [];
+    const { data, error } = await supabase
+        .from("movimientos")
+        .select(MOVIMIENTO_DETALLE_SELECT)
+        .eq("id_tipo", tipoRow.id)
+        .order("fecha", { ascending: false })
+        .limit(2000);
+    if (error) throw error;
+    return (data ?? []).map(mapMovimiento);
+}
+
+export function groupEntregasPorEmpleado(movimientos) {
+    const groups = new Map();
+    for (const mov of movimientos ?? []) {
+        const empleado = mov.empleado;
+        if (!empleado?.id) continue;
+        if (!groups.has(empleado.id)) {
+            groups.set(empleado.id, { empleado, entregas: [] });
+        }
+        groups.get(empleado.id).entregas.push(mov);
+    }
+    const rows = [...groups.values()].map((group) => {
+        const entregas = [...group.entregas].sort((a, b) => {
+            const byFecha = new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+            if (byFecha !== 0) return byFecha;
+            return String(b.id).localeCompare(String(a.id));
+        });
+        return {
+            empleado: group.empleado,
+            entregas: entregas.map((mov) => ({
+                ...mov,
+                recambiado: entregas.some((other) => (
+                    other.id !== mov.id
+                    && new Date(other.fecha).getTime() > new Date(mov.fecha).getTime()
+                )),
+            })),
+        };
+    });
+    return rows.sort((a, b) => {
+        const byApellido = (a.empleado.apellido ?? "").localeCompare(b.empleado.apellido ?? "", "es");
+        if (byApellido !== 0) return byApellido;
+        return (a.empleado.nombre ?? "").localeCompare(b.empleado.nombre ?? "", "es");
+    });
 }
 
 export async function getMovimiento(id) {

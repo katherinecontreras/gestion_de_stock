@@ -1,0 +1,407 @@
+Dominio de Gestión de Stock
+objetivo
+esta plataforma es para tener un registro de todos los artículos que tiene la empresa, con sus proveedores y cada deposito con los respectivos responsables de cada depósito y poder gestionar cada movimiento que tienen los artículos entre los depósitos, si es de entrada, salida o transferencia.
+Acá los usuario se guardan como responsables a los cuales se les podrá asignar los siguientes
+roles:
+Administrador: Carga, edición y baja de artículos, depósitos, proveedores, familias y movimientos, y ve el historial completo. En Administración de responsables solo visualiza, edita y elimina (no crea ni invita usuarios). Puede cambiar el rol, el estado y los depósitos asignados de cada responsable. El primer administrador se carga por fuera de la plataforma (seed). Nadie se registra con rol Administrador, tiene que ser asignado por otro Administrador.
+Responsable de Deposito: Ve los artículos y movimientos de los depósitos que tenga asignados (puede ser más de uno) y puede cargar movimientos en esos depósitos, incluida la Entrega EPP. Un depósito puede tener varios responsables y un responsable puede estar asignado a más de un depósito. Si su estado es inactivo, no puede ingresar a la plataforma.
+Vista y descarga: Tiene acceso a toda la información de la plataforma igual que el Administrador (artículos, depósitos, proveedores, familias, movimientos, responsables, notificaciones e historial de entregas). Solo puede ver y descargar. No puede crear, editar, eliminar, cargar (ni masiva ni individual), hacer movimientos ni ninguna otra acción de escritura.
+Empleado: Persona que recibe EPP. No opera la plataforma: no inicia sesión, no tiene contraseña, solo figura en entregas, inventario EPP e historial de entregas. No aparece como opción al registrarse. Solo se crea o se elige al cargar una Entrega EPP.
+Alta: en el movimiento se busca por nombre. En los resultados se ven nombre, apellido, DNI y mail para confirmar si es la misma persona. Si está, se selecciona. Si no, se crea con nombre, apellido, DNI y mail.
+Estas son todas las páginas que tendrá la plataforma:
+Login
+Registro
+Recuperar Contraseña
+Administración de responsables
+Artículos
+Historial de articulo
+Familias/Grupos
+Gestionar Grupos y Artículos
+Proveedores
+Depósitos
+Movimientos (incluye dos vistas de inventario: artículos y EPP)
+Detalle de Movimiento
+Nuevo movimiento
+Historial de Entregas
+Notificaciones de la Plataforma
+Historial de Notificaciones
+Ahora los requerimientos funcionales para cada pagina
+Login (Todos)
+Ingreso a plataforma
+Primera página para ingresar a la plataforma: cargan DNI y contraseña. Si todavía no está registrado, presiona “Registrarme”. Si olvidó la contraseña, presiona “Recuperar contraseña” en esta misma pantalla (no se recupera desde Administración de responsables). Si el responsable está inactivo, no puede ingresar aunque la contraseña sea correcta.
+Registro (Vista y descarga y Responsable de Deposito)
+Registrarme como usuario
+En la página de registro carga: nombre, apellido, email, DNI, rol (Responsable de depósito o Vista y descarga) y la contraseña dos veces, indicándole que ingresa con DNI y contraseña. No puede elegir Administrador. Si el rol es Responsable de depósito, antes de pasar a la vista de código de ingreso se muestra una tabla de depósitos activos (código, nombre, ubicación) con búsqueda y checks para marcar uno o más (mínimo uno). Al guardar se crea el responsable (created_at) y quedan asignados esos depósitos. Si el rol es Vista y descarga, no se muestra esa tabla: al entrar verá toda la información pero solo podrá ver y descargar. Después de guardar, se redirige a la vista de código de ingreso.
+Ingresar código de ingreso
+En la vista de código mostrara 6 inputs de un digito cada uno que tendrá que llenar, este código se le pasara por el mail que guardo y tendrá un botón debajo de volver a enviar, mostrando el mail que cargo y por si se equivocó un botón de cambiar mail que hará que el texto donde estaba su mail se convierta en input así lo cambia y tenga un botón de guardar para guardarlo en su usuario responsable y volver a mandar el código al mail que guardo. Cuando ya agrego el código de 6 dígitos, y envía, lo redirigirá a la pagina de login con el DNI del usuario ya puesto así solo agrega la contraseña
+Recuperar Contraseña (Todos)
+Mail de Recuperar contraseña
+Desde el Login, si olvidó la contraseña, pide recuperarla. Le llega un mail para volver a ingresar a la plataforma de Gestión de Stock y presionar “Recuperar Contraseña”. El administrador no envía este mail desde la tabla de responsables.
+Recuperar contraseña
+Esta página es la de recuperar contraseña (no es la de registro). Carga la contraseña nueva dos veces. Al guardar se actualiza updated_at y redirige al login para entrar con DNI y la nueva contraseña.
+Administración de responsables
+Vista de responsables (Administrador y Vista y descarga)
+En una tabla verá Nombre, Apellido, DNI, Email, Rol y Estado (activo/inactivo). Podrá buscar por nombre/apellido/DNI/email y filtrar por rol. En acciones solo están “Editar” y “Eliminar”. No hay “Cargar nuevo responsable”, ni invitar, ni recuperar contraseña desde esta página.
+Edición de responsables ( Rol Administrador )
+Al presionar “Editar” se muestran nombre, apellido, DNI, email, rol (select) y estado (activo/inactivo). Si el rol es o pasa a Responsable de depósito, aparece la misma tabla de depósitos activos (búsqueda y checks) para asignarle uno más o quitarle alguno (mínimo uno). Si el rol deja de ser Responsable de depósito, se desvincula de todos los depósitos. Al guardar se actualiza updated_at.
+Eliminación de responsables ( Rol Administrador )
+Al lado de “Editar” está “Eliminar”. Si confirma, se borra el responsable y se desvincula de todos los depósitos. Si tiene movimientos en el historial, no se puede eliminar: se le indica que cambie el estado a inactivo. Inactivo no puede ingresar a la plataforma, tenga o no contraseña.
+Estado del responsable ( Rol Administrador )
+El estado activo/inactivo se cambia en Editar. Inactivo no entra a la plataforma. Se usa cuando no se lo puede eliminar porque tiene movimientos. No hace falta invitado_en, registrado ni registrado_en: created_at indica cuándo se registró y updated_at cuándo se editó o recuperó la contraseña.
+Gestión de depósitos del responsable ( Rol Administrador )
+El administrador asigna o quita depósitos de cada usuario desde Editar en esta página (además de lo que eligió la persona al registrarse). Un responsable puede tener varios depósitos y un depósito varios responsables. Vista y descarga y Administrador no llevan depósitos asignados: el primero ve y descarga todo; el segundo gestiona todo.
+Toast de la plataforma (Todos)
+Hay un toast global (verde si salió bien, rojo si salió mal) para altas, ediciones, bajas, recuperación de contraseña, registro y movimientos, así el usuario sabe cómo salió lo que hizo.
+Artículos
+Visualización de Todos los Artículos (Administrador y Vista y descarga)
+Al ingresar verá en una tabla los siguientes valores de cada artículo (más una columna de acciones con “Editar”, “Eliminar” y “Ver Historial” solo para el Administrador): familia (“código – descripción”), grupo (“código – descripción”), código artículo, nombre, unidad, estado, si es EPP, costo (flechas para ordenar).Podrá buscar por nombre y filtrar por familia y por grupo. Vista y descarga ve la misma tabla y puede descargar; no tiene acciones de editar, eliminar ni cargar.
+Solo visualización de artículos de sus depósitos (Responsable de depósito)
+Al ingresar ve la misma tabla que el administrador, sin la columna de acciones, con la misma búsqueda y filtro, solo de los artículos de los depósitos que tenga asignados.
+Edición de Artículos ( Rol Administrador )
+Al presionar el botón de editar, la fila del articulo mostrara los datos en inputs y la familia/grupo/estado en select (solo aparecen los grupos de la familia seleccionada), Checkbox “Es EPP”, el costo se ve como texto con un botón de x: si lo presionan se quita el precio y aparece el input vacío para un precio nuevo, con check para guardar y x para cancelar. En acciones: “guardar” o “cancelar”.
+Eliminación de Artículos ( Rol Administrador )
+Al presionar el botón de “Eliminar”, le mostrara un toast para confirmar como el que aparece cuando eliminan responsables (el componente de ese toast debe ser global así se usa en cada botón de eliminar que tenga la plataforma)
+Carga masiva de Artículos por Excel ( Rol Administrador )
+En el header del título estará el botón de “Carga Masiva” este abrirá un modal para que arrastre o seleccione el archivo de Excel con los datos de los artículos (se carga con el mismo Excel de descarga que genera la plataforma para que el usuario descargue) así al cargar ,se insertan o modifican artículos (no se eliminan)
+Carga Individual de Articulo ( Rol Administrador )
+En el header también estará un botón de “Cargar Articulo” el cual abre un modal de formulario global con los datos del artículo, con inputs y solo con select la familia/grupo/estado.
+Descarga de Archivos (Administrador, Responsable de depósito y Vista y descarga)
+En el header estará “Descargar Archivos”. Se elige descargar todos, por depósito o por familia/grupo. Vista y descarga usa las mismas opciones que el Administrador. El Responsable de depósito solo descarga lo de sus depósitos.
+Familias/Grupos
+Visualización de Familias/Grupos (Administrador y Vista y descarga)
+el usuario podrá ver una tabla con los siguientes datos: código, nombre, cant grupos(con flechas para ordenar de mayor a menor en el header),  cant artículos (con flechas para ordenar de mayor a menor en el header), costo total (con flechas para ordenar de mayor a menor en el header)  y la columna de acciones para “Editar”, “Eliminar” y “Gestionar Grupos y Artículos”. En la tabla podrá buscar (input de búsqueda) por nombre/código de la familia
+Descarga de Familias/Grupo (Administrador y Vista y descarga)
+En la página abra un botón de descargar que abrirá un modal así el usuario selecciona si quiere descargar todas o solo alguna/s familias, seleccionando la/s familias así la/s descarga con sus grupos. Este descargara en el Excel profesional que estará enlazado entre sí, en la planilla principal se llamara Familias y estarán todas las familias (que selecciono) en una tabla, esta tabla tendrá la columna de código y descripción, luego se creara una planilla por cada familia que se encuentre en la planilla principal en donde se encontraran los grupos de cada familia y en el header estará el código y descripción de la familia que pertenecen esos grupos ,conectando esas celda del código y desc de la familia con las celdas de la planilla principal así saben que todos esos grupos están conectados con esa familia, y abajo del header estaría la tabla con la columna de código y descripción con cada grupo y de esta forma se organizaría cada planilla que tienen los grupos de cada familia
+Carga masiva de Grupos a Familia ( Rol Administrador )
+Al lado del botón de descargar ,estará el botón de cargar, así también se le abre el mismo modal para seleccionar las familias que cargara, así puede cargar muchos grupos a distintas familias o solo por una familia de forma masiva usando el mismo Excel que descargo de las familias y sus grupos para ahí adjuntar todo los nuevos grupos a cada familia ( no podrá crear familias ahí, solo agregar grupos de manera masiva a varias familias al mismo tiempo, la carga de familia se hace de manera individual ).
+Cargar nueva Familia ( Rol Administrador )
+Al abrir el modal de "Cargar nueva Familia", el responsable tendrá para cargar la descripción y el sistema sugerirá automáticamente un código correlativo de tres dígitos (ej. 000, 001, 002). Este código autogenerado evalúa el último número registrado y suma 1. El campo será editable por el usuario. Si el usuario asigna un código manualmente (ej. 015), el sistema validará en tiempo real que el código no exista. De existir, bloqueará la acción y mostrará una alerta indicando a qué familia pertenece dicho código. La correlatividad automática siempre continuará a partir del último código secuencial disponible para evitar vacíos.
+Editar Familia/Tipo ( Rol Administrador )
+Al presionar el botón de “Editar” se verán en inputs los valores de: código, nombre para que pueda editarlos y luego guardar (la cant grupos, cant artículos y costo total no son editables ya que eso se va actualizando cada que se le asignen/quiten este tipo a algún artículo)
+Eliminar Familia/Tipo ( Rol Administrador )
+Al presionar el botón de “Eliminar” le aparecerá el toast para que confirme que si elimina este tipo, todos los grupos también se eliminaran junto con la familia y los artículos de esos grupos se quedaran sin ningún grupo asignado (los artículos no se borrarían en esta acción).
+Gestionar Grupos y Artículos ( Rol Administrador )
+Al presionar el botón de Gestionar Grupos y Artículos en la fila de alguna familia, va a redirigir a la página del detalle de la familia con sus respectivos grupos y gestión de artículos
+Gestionar Grupos y Artículos
+Visualización de Grupos (Administrador y Vista y descarga)
+Apenas ingresen se verá una tabla con el código, descripción, cant artículos, costo total y la de acciones, así se ve por cada grupo cuantos artículos tienen en total y costo total de todos los artículos. En la columna de acciones estará el botón de “Gestionar Artículos”, “Editar” y “Eliminar”
+Edición de Grupos ( Rol Administrador )
+Con el botón de “Editar”, solo podrán editar el código y descripción del grupo, las columnas de cant y costos total se calculan de manera automática por el sistema
+Eliminación de Grupo ( Rol Administrador )
+Al presionar el botón de “Eliminar” aparecerá un Toast de confirmación indicándole que si elimina el grupo, todos los artículos que estaban asociados a él, quedaran con el valor de grupo vacío
+Gestionar Artículos ( Rol Administrador )
+Al presionar el botón de “Gestionar Artículos” se abrirá un modal mostrando en una tabla con las siguientes columnas para mostrar todos los artículos: 1 icono de check ,código Familia, código grupo, código artículo, nombre, unidad y depósito. Así en la columna del icono de check cada artículo tendrá un check para que el usuario seleccione cada artículo que quiere que cambie su grupo y familia, y ya deben aparecer seleccionados los que tengan ese grupo que están gestionando sus artículos (ejem: si entro al gestionar artículos del grupo de accesorios ,todos los artículos de ese tipo ya deben estar con el check) y cuando confirme entonces reemplazara ,agregara o eliminara (si le quita el check a uno que ya lo tenía) al artículo para dejarlos asignados a ese grupo. Siempre se verán en las primeras filas los artículos que ya están seleccionados, a menos que el usuario en el input de búsqueda, busque otros artículos para agregar, ahí si se mostrarían las opciones más cercanas a la búsqueda
+Historial del articulo
+Visualizar historial de movimientos (Administrador y Vista y descarga)
+Al presionar el botón de "Ver Historial", la vista por defecto (default) mostrará la línea de tiempo de movimientos del artículo. El ordenamiento estándar será cronológico descendente (los movimientos más recientes en la parte superior ). Incluye Entrega EPP . En cada entrega se ve el empleado, el tipo de entrega, la fecha de recambio y si está pendiente, debe recambiarse o ya fue recambiado. Un botón en la cabecera alterna a “Historial de Costos”.
+Visualizar historial de costos (Administrador y Vista y descarga)
+Al presionar el botón de “Ver Historial de Costos” se verá cada costo que tuvo el articulo como en línea de tiempo como están los movimientos, así se puede ver cuáles son los costó que ha tenido el articulo al pasar el tiempo
+Proveedores
+Visualización de Proveedores (Administrador y Vista y descarga)
+Apenas se ingresa podrá ver la tabla con todos los datos de cada proveedor más una columna de acción para “Editar” o “Eliminar”. En la tabla podrá buscar (input de búsqueda) por cualquiera de sus datos
+Edición de Proveedor ( Rol Administrador )
+Al presionar el botón de “Editar” todos los datos se verán en inputs para que el usuario pueda editar y guardar el código y razón social(cambiando los botones de editar y eliminar por guardar y cancelar)
+Eliminación de Proveedor ( Rol Administrador )
+Al presionar el botón de “Eliminar” le aparecerá el todas de confirmación que si elimina entonces ya no podría agregarlo a ningún movimiento y quedara con estado de inactivo/no visible ,así si está en movimientos previos no se va a eliminar solo se le cambiara el estado ha eliminado y no aparecerá más en la tabla de la plataforma, pero si en la base de datos para que puedan verlo en los movimientos.
+Carga de nuevo Proveedor ( Rol Administrador )
+En el header estará el botón de “Cargar nuevo Proveedor” que abrirá el modal de formulario de carga así le agrega el código y razón social del proveedor y guarda el nuevo.
+Descarga de Excel (Administrador y Vista y descarga)
+En el header estará el botón de “Descargar Excel”. Al presionarlo descarga un archivo Excel con la tabla de proveedores activos que se está viendo (si hay una búsqueda, descarga el resultado filtrado). El Excel tiene una planilla llamada Proveedores con las columnas Código y Razón social, el mismo formato que se usa después para la carga masiva.
+Carga masiva de Proveedores por Excel ( Rol Administrador )
+Al lado del botón de descarga estará el botón de “Carga masiva”. Abre un modal para arrastrar o seleccionar el archivo Excel (se carga con el mismo Excel que genera la plataforma al descargar). Al cargar, se insertan proveedores nuevos o se modifican los existentes según el código; no se eliminan. Si el código pertenecía a un proveedor inactivo, vuelve a quedar activo. Las filas incompletas o con código repetido en el archivo se rechazan y se muestra el error.
+Depósitos
+Visualización de Depósitos (Administrador y Vista y descarga)
+el usuario podrá ver una tabla con los siguientes datos: código, nombre, ubicación, responsable (nombre y apellido), cant artículos (con flechas para ordenar de mayor a menor en el header), costo total (con flechas para ordenar de mayor a menor en el header) y la columna de acciones para “Editar”, “Eliminar”. En la tabla podrá buscar (input de búsqueda) por nombre/código
+Cargar nuevo Depósito ( Rol Administrador )
+En el header estará el botón de “Cargar nuevo Deposito” y cuando lo presionen abrirá el modal de formulario para carga única, donde cargara lo siguiente: Nombre, código y ubicación (input texto), Responsable (select de responsables). La cantidad de artículos y costo total se calcula al pasar el tiempo de manera automática la plataforma
+Editar Deposito ( Rol Administrador )
+Al presionar el botón de “Editar” se verán en inputs los valores de: código, nombre, y ubicación para que pueda editarlos y el de responsable en un select para que seleccione entre los responsables que existen, mostrando por nombre y apellidos (la cant artículos y costo total no son editables ya que eso se va actualizando cada que se le asignen/quiten este tipo a algún artículo)
+Eliminar Deposito ( Rol Administrador )
+Al presionar el botón de “Eliminar” le aparecerá el todas de confirmación que si elimina entonces ya no podría agregarlo a ningún movimiento y quedara con estado de inactivo/no visible ,así si está en movimientos previos no se va a eliminar solo se le cambiara el estado ha eliminado y no aparecerá más en la tabla de la plataforma, pero si en la base de datos para que puedan verlo en los movimientos.
+Descarga de Excel de Depósitos (Administrador y Vista y descarga)
+En el header estará “Descargar Excel”. Descarga la tabla que se está viendo (si hay búsqueda, el resultado filtrado). El Excel tiene una planilla “Depósitos” con las columnas Código, Nombre y Ubicación, el mismo formato que se usa después para la carga masiva. No incluye responsables: esos se asignan en la plataforma.
+Carga masiva de Depósitos por Excel ( Rol Administrador )
+Al lado de descargar estará “Carga masiva”. Abre un modal para arrastrar o seleccionar el Excel (el mismo de la descarga). Se insertan depósitos nuevos o se actualizan por código (nombre y ubicación); no se eliminan ni se reactivan inactivos. Mismo código y mismos datos = no se toca. Filas incompletas o con código repetido en el archivo se rechazan.
+Gestionar responsables del depósito ( Rol Administrador )
+En la columna de acciones de cada depósito estará “Gestionar responsables”. Abre un modal con una tabla tipo select (check por fila) de todos los usuarios de la plataforma. Columnas: check, nombre y apellido. Los que ya están asignados a ese depósito vienen marcados y siempre se muestran arriba. Un input de búsqueda filtra la tabla por nombre y apellido. Al guardar se agregan los marcados, se quitan los que se destildaron y se reemplaza la lista de ese depósito. Un depósito puede quedar sin responsables; el administrador igual lo gestiona. Un usuario puede quedar en varios depósitos.
+Movimientos
+Vista de Movimientos ( Rol Administrador )
+Apenas ingresa a la página vera un tabla con los siguientes datos: deposito ( si es de entrada solo el depósito que entro y si es salida o transferencia estará así “deposito origen / deposito destino ), Responsable (que realizo el movimiento de Entrada, Salida o transferencia) ,fecha (con flechas para ordenar de más cercana o lejana en el header) movimiento (Entrada|Salida|Tranferencia), cant Artículos (con flechas para ordenar de mayor a menor en el header),  y una columna de acciones, con un botón de “ver detalle”. En la tabla podrá buscar (input de búsqueda) por nombre/responsable/depósito y filtrar por tipo de movimiento (select)
+Vista de Movimientos por Deposito ( Rol Responsable de Deposito )
+El responsable de Deposito solo puede ver los movimientos que se han hecho en su depósito , así él también puede buscar, filtrar y ver el detalle de los movimientos de los artículos que le correspondan
+Dos vistas de inventario en esta página (Administrador, Vista y descarga; el responsable solo lo de sus depósitos):
+•Inventario de artículos: stock real por depósito (inventario_depositos). Se actualiza con entrada, salida, transferencia y entrega EPP (esta última solo resta el origen).
+•Inventario EPP: por depósito destino, artículos que está usando cada empleado, cantidades, días que faltan para el recambio y alerta en la fila si ya hay que recambiar.
+Detalle de Movimiento ( Rol Administrador y Rol Responsable de Deposito )
+Visualización de detalle del movimiento
+Al ingresar al detalle del movimiento se ven todos los datos del movimiento y abajo la tabla de artículos: familia, grupo, código, nombre, cantidad, observación. Si es Entrega EPP: tipo de entrega, empleado (nombre, apellido, DNI, mail), fecha de recambio y estado de recambio (pendiente / debe recambiarse / recambiado). Las fotos del remito pueden ser varias (el remito puede tener más de una hoja).
+Nuevo movimiento ( Rol Administrador y Rol Responsable de Deposito )
+Carga de nuevo movimiento
+Esta página tiene varios pasos, cada que completen un paso es que irán al siguiente y se podrán mover entre cada paso sin perder la información (con una barra arriba por cada paso completo así sabe cuánto le falta para cargar el movimiento ), apenas ingresa se le muestra el primer paso, no puede pasar al siguiente paso si no ha completado el que se encuentra, si volvió a un paso que ya está completo entonces sí podría seguir ya que ya está completo, y una vez termine todos los pasos, tendrá una última vista de revisar y cargar donde vera todo lo que cargo en cada paso para editar ahí mismo en caso que se haya equivocado, así cuando revise que este todo bien cargue el movimiento:
+Paso 1 : selección de tipo de movimiento, aquí indica si es de Entrada|Salida|Transferencia|Entrega EPP.
+Paso 2 : carga de datos del tipo de movimiento seleccionado (buscando en sus respectivas tablas que datos necesita cargar ) los formularios serían los siguientes: PD: El responsable y fecha no hace falta que aparezca en ninguno de los siguientes formularios ya que eso es automático por el usuario que entra y la fecha actual. Además, en cada formulario antes de seguir al final tienen que agregar siempre el nro. remito (input texto)e imagen/es remito (tomar foto que escanea el remito y lo transforma a doc, se pueden escanear mas de una porque puede tener más de una página el remito)
+Formulario Entrada: depósito destino ( select ), proveedor ( select )
+Formulario Salida: deposito origen (select sin la opción del depósito destino si ya lo selecciono), deposito destino (select, sin la opción del depósito origen seleccionado), ¿es devolución? (select Si o No para true ir false) ,si es devolución aparecerá un select para que seleccione el proveedor.
+Formulario de Transferencia: depósito de origen y destino como en el formulario de salida, motivo (opcional / textarea ).
+Formulario de Entrega EPP: depósito origen, depósito destino (distinto), tipo de entrega (Ingreso | Recambio por rotura | Recambio por talle), observación (opcional), empleado.PD: Empleado en Entrega EPP. Búsqueda por nombre. En la lista se ven nombre, apellido, DNI y mail para confirmar. Si no está, se da de alta ahí mismo con esos cuatro datos, sin Auth. Un movimiento es para un solo empleado; ese empleado puede recibir varios artículos EPP. Si hay que entregar a otra persona, se carga otro movimiento.
+Paso 3: Selección de Artículos para mover: en este paso tendrán un input de búsqueda por código/nombre del articulo para que puedan filtrar la tabla donde estarán con las siguientes columnas:
+Check: esta es la columna donde seleccionaran el articulo
+Código: vista
+Nombre: vista
+Unidad: vista
+Cantidad: inicialmente no tendrá nada, solo se le activara un input numérico para agregar el nro obligatorio. sí selecciona el articulo
+Observación: inicialmente no tendrá nada, solo se le activara un input de textarea opcional cuando este seleccionado por si tiene alguna observación
+En la tabla se mostraran todos los artículos del depósito/deposito origen (si es entrada mostrara todos los artículos que existan, y si es salida o transferencia solo mostrara los artículos del depósito que selecciono de origen). Así cada que seleccionen un artículo se agregara a la tabla de movimientos artículos vinculándolo con el id del tipo de movimiento (entrada/salida/trasferencia) y aquí es donde se actualizara la cantidad total del movimiento sumándole todas las cantidades que se le agregan a cada artículo seleccionado , así el usuario va viendo cuantos van. Entrega EPP: solo artículos con is_epp = true y disponibles para operar. La cantidad total del movimiento es la suma de las cantidades seleccionadas.
+Paso 4 (Final de revisión): aquí muestra como header el movimiento seleccionado en el paso 1 ,abajo los input o select del paso dos con los valores que ya cargo (por si quiere editarlos) y las imagen/es de los remitos visibles (con una x en la esquina y un botón de agregar que abra un modal para arrastrar o seleccionar otra como aparece en el paso dos pero en modal) con el nro. remito sobre las imágenes como input estilo header. Luego estará el total de los artículos y abajo la tabla con solo los artículos que selecciono con sus valores (podrán deseleccionarlos y agregar más artículos aquí mismo en un botón de agregar más que estará en el header de la tabla que le abrirá el modal con la tabla que aparece en el anterior paso para seleccionar más (con el input de búsqueda y un botón de agregar así se agregan a la tabla de revisión y se cierra el modal) y debajo de todo esto estarán los botones de cargar movimiento
+Reglas de stock y de inventario EPP
+Inventario de artículos (cantidad_actual en el depósito):
+•Entrada: suma en el destino.
+•Salida: resta en el origen.
+•Transferencia: resta en el origen y suma en el destino.
+•Entrega EPP: resta en el origen. El destino no suma stock de estantería (el EPP se lo queda el empleado).
+Inventario EPP (inventario_epp_personal). Es la cantidad que está usando el empleado en el depósito destino. Estado no disponible (no es stock de estantería). La cantidad sí se actualiza en cada entrega:
+•Primera entrega a ese empleado: por cada artículo se suma la cantidad entregada (se crea la fila si no existe).
+•Nueva entrega al mismo empleado (recambio): primero se resta, de cada artículo, la cantidad de su última entrega. Después se suman las cantidades de la entrega actual.
+•Si en el recambio un artículo de la última entrega no viene en la actual, esa fila se borra del inventario EPP (se reemplazó; ya no lo tiene).
+•Así el inventario EPP siempre muestra lo que el empleado tiene ahora, no el histórico mezclado.
+Fecha de recambio: fecha del movimiento + 30 días, automática. El recambio queda hecho cuando se carga otra Entrega EPP al mismo empleado. Eso actualiza cantidades (regla de arriba), corre la fecha de recambio otros 30 días y apaga la alerta.
+Historial de Entregas
+Administrador y Vista y descarga ven todos los empleados. El Responsable de depósito ve los empleados/entregas de sus depósitos.
+Tabla de empleados: nombre, apellido, DNI, mail. Cada fila es un acordeón. Al abrirla se ve una línea de tiempo con todas las Entregas EPP de ese empleado (fecha, tipo de entrega, depósitos, remito, responsable que entregó, fecha de recambio / alerta) y, en cada entrega, los artículos y cantidades.
+Notificaciones de la Plataforma (Barra de Navegación / Navbar): Los usuarios con acceso visualizarán un ícono de campana en la barra de navegación superior (Navbar). Este módulo registrará y notificará los eventos del sistema mediante Triggers automatizados desde la base de datos.
+Notificaciones de creación ( Rol Administrador )
+Aquí se notificara cada que se cree algún dato nuevo, que no haya existido antes. indicando la feche, hora, responsable, tabla y valor que se cree en las siguientes tablas:
+Artículos
+Precio articulo
+Familias
+Grupos
+Proveedores
+Depósitos
+Responsables (incluye alta de Empleado al cargar una entrega).
+Notificaciones de modificación ( Rol Administrador )
+Aquí se notificara cada que se edite algún dato de las mismas tablas de la notificación de creación (en la de responsable la modificación del rol no cuenta ya que ese queda guardado en la notificación de asignación de rol ) indicando la fecha, hora, responsable, tabla, valores anteriores y valore actuales (así muestra cada valor que se editó del dato como en lista de como estaban anteriormente vs como quedaron con la modificación)
+Notificaciones de eliminación ( Rol Administrador )
+Aquí se notificara cada que se elimine algún dato de las mismas tablas de la notificación de creación indicando la fecha, hora, responsable, tabla, valor eliminado
+Notificaciones de asignación de rol ( Rol Administrador )
+Aquí se notificara cada que se asigne algún valor especifico indicando la fecha, hora responsable, de la tabla de responsables ,así cada que se le modifique el rol, pase de administrador a responsable de depósito o a Vista/consulta o viceversa se indica que se le asigno el rol de… al responsable que anteriormente tenía el rol de…
+Notificación de envió de mail para invitación a plataforma ( Rol Administrador )
+Aquí se notifica la fecha, hora, responsable y datos del responsable que se invitó a la plataforma para saber cuándo se le mando la invitación.
+Notificación de Bienvenida a la plataforma ( Todos )
+Aquí se notificara cuando el responsable que se invitó ya cree su contraseña, así cuando ingresa ya tiene la notificación de bienvenido, indicando la fecha hora y datos del nuevo responsable en la bienvenida de la plataforma
+Notificación de envió de mail para recuperación de contraseña ( Rol administrador )
+aquí se notifica la fecha, hora, responsable y datos del responsable que se le mando el mail para recuperar la contraseña para saber cuándo se le mando el mail.
+Notificación de Ingreso exitoso con nueva contraseña ( Rol Administrador y Responsable que ingreso )
+Aquí se notificara cuando se haya cambiado la contraseña del responsable que se le haya mandado un mail para recuperar solo con la fecha, hora y responsable que ya creo una nueva contraseña (obvio sin mostrar la contraseña)
+Notificación de carga de movimiento ( el Rol Administrador podrá ver todos los movimientos, pero los responsables de depósitos solo podrán ver si su depósito está en relación con el movimiento )
+Aquí se notificara los siguientes valores cada que se cargue algún nuevo movimiento:
+El tipo de movimiento
+la fecha/hora
+Responsable que cargo el movimiento
+sí es tipo entrada solo el depósito y si es de salida o trasferencia, los depósitos se verían como “depósito de origen/depósito de destino”,
+sí tiene motivo o proveedor también mostrar
+cantidad total
+si es Entrega EPP, también el empleado.
+Notificacion de Alerta de recambio EPP (Administrador, responsable que cargó esa entrega y, en mail, el empleado).
+Cuando se cumple fecha_recambio y todavía no hay otra Entrega EPP a ese empleado, se genera la notificación Alerta_Recambio_EPP en la campana y se envía un mail al empleado y al responsable que hizo el movimiento, indicando que ya es hora de recambiar esos artículos en el depósito destino. La alerta también se ve en el inventario EPP, en la fila del movimiento y en el historial del artículo.
+Historial de notificaciones (Rol Administrador y Vista y Descarga)
+Visualización de Todas las Notificacionesen el navbar habrá un botón de tuerca que al presionarla aparecerán las opciones para acceder a las páginas de Administración de responsables y a la página de Historial de Notificaciones, así cuando ingresa a la Historial de notificaciones muestra en una tabla todas las notificaciones con filtros para ver todas las notificaciones en las siguientes columnas: Acción, fecha/hora, responsable de acción, tabla, desc (ahí contiene los valores que anterior del dato (si es de modificación o asignación de rol), los valores del dato que se le hizo la acción, los depósitos, etc.)
+Filtrado de Notificaciones
+Sobre la tabla estará un input de búsqueda por código ( ya que la mayoría de tablas tienen código de algo) y al lado del input tendrá los siguientes select así pueden filtrar por varias cosas como:
+acciones: Creación, Eliminación, Modificación, Asignación de rol, Invitación, Bienvenida, Recuperación de contraseña/ingreso, carga de movimientos
+tipo de movimiento: Entrada de Stock, Salida de Stock, Transferencia de Stock
+tablas: responsables, artículos, tipos de artículos, precios de artículos, depósitos y proveedores
+Requerimientos No Funcionales y Técnicos
+Paginación y Rendimiento: Todas las tablas de visualización (Artículos, Historial, Movimientos y Notificaciones) deberán implementar paginación del lado del servidor (Server-Side Pagination) y carga diferida (Lazy Loading) para evitar caídas de rendimiento cuando el volumen de datos escale.
+Autenticación y Seguridad: La gestión de sesiones, recuperación de contraseñas y encriptación se realizará delegando la seguridad a Supabase Auth. Las contraseñas no se guardarán en texto plano. Se utilizarán políticas de seguridad de nivel de fila (Row Level Security - RLS) en Supabase para garantizar que los Responsables de Depósito no puedan acceder vía API a datos de otros depósitos.
+Integridad de Datos: No se realizarán borrados físicos (Hard Deletes) en tablas transaccionales o de maestros (Proveedores, Responsables, Artículos, Depósitos). Se implementará borrado lógico (Soft Delete) cambiando el estado a "Inactivo" para preservar la integridad del historial de movimientos y notificaciones.
+Transacciones: La carga de "Nuevos Movimientos" que afecten múltiples artículos debe ejecutarse mediante transacciones (Transacciones SQL o RPC en Supabase) para asegurar que si falla la inserción de un artículo, no se guarde un movimiento incompleto.
+Tablas de la Base de Datos (Esquema Relacional):
+Proveedores
+id (UUID/Int, PK)
+cod_proveedor (Varchar, Único)
+razon_social (Varchar)
+estado (Booleano/Enum: Activo, Inactivo) (Agregado para el borrado lógico)
+created_at, updated_at
+Role
+id (Int, PK)
+tipo (Administrador | Responsable_Deposito | Vista_Descarga | Empleado)
+descripción
+Empleado no se ofrece en el registro. Administrador no se elige en el registro.
+Responsables (Usuarios)
+id (UUID, PK)
+auth_user_id (UUID, nullable, único — vacío en Empleado)
+nombre (Varchar)
+apellido (Varchar)
+dni (Varchar, Único)
+email (Varchar, Único)
+id_rol (Int, FK a Role)
+estado (Activo/Inactivo: inactivo no puede ingresar a la plataforma)
+created_at (cuando se registró)
+updated_at (cuando se editó o recuperó la contraseña)
+No existen las columnas registrado, invitado_en ni registrado_en. La contraseña no está en esta tabla: la gestiona Supabase Auth. El Empleado no tiene Auth.
+Deposito
+id (UUID/Int, PK)
+codigo (Varchar, Único)
+nombre (Varchar)
+ubicacion (Varchar)
+cant_articulos (Int - Calculado automáticamente)
+costo_total (Decimal/Float - Calculado automáticamente)
+estado (Booleano: Activo/Inactivo) (Agregado para borrado lógico)
+created_at, updated_at
+Depositos_Responsables
+id (UUID, PK)
+id_deposito (UUID, FK a Deposito)
+id_responsable (FK a Responsables — operadores, no Empleado)
+Familias
+id (UUID/Int, PK)
+codigo (Varchar, Único - Ej. '001')
+descripcion (Varchar)
+estado
+created_at, updated_at
+Grupos
+id (UUID/Int, PK)
+id_familia (UUID/Int, FK a Familias)
+codigo (Varchar, Único)
+descripcion (Varchar)
+estado
+created_at, updated_at
+único (id_familia, codigo)
+Articulos
+id (UUID/Int, PK)
+id_grupo (UUID/Int, FK a Grupos)
+codigo (Varchar, Único)
+nombre (Varchar)
+unidad_de_medida (Varchar) is_epp (Boolean, default false) — es elemento de protección personal
+estado (Activo / Inactivo)
+created_at, updated_at
+Inventario_Depositos (Stock actual de cada artículo por depósito. Se actualiza con triggers en cada movimiento: entrada, salida, transferencia, entrega EPP. En Entrega EPP solo resta el origen; no suma el destino)
+id (UUID/Int, PK)
+id_deposito (UUID/Int, FK a Deposito)
+id_articulo (UUID/Int, FK a Articulos)
+cantidad_actual (Int)
+único (id_deposito, id_articulo)
+Inventario_EPP_Personal(Registro de EPP en uso, por depósito destino + empleado + artículo. Estado no disponible. La cantidad es lo que está usando el empleado y se mantiene al día con cada entrega.)
+id (UUID, PK)
+id_deposito (FK a Depósitos — destino)
+id_empleado (FK a Responsables, rol Empleado)
+id_articulo (FK a Artículos, is_epp = true)
+cantidad (Int — unidades que está usando)
+disponible (Boolean — siempre false)
+id_movimiento (FK a Movimientos — última entrega que actualizó esta fila)
+fecha_entrega
+fecha_recambio
+único (id_deposito, id_empleado, id_articulo)
+Costos_Articulos
+id (UUID/Int, PK)
+id_articulo (UUID/Int, FK a Articulos)
+fecha (Timestamp)
+costo (Decimal/Float)
+id_responsable (UUID, FK a Responsables) (Agregado para saber quién cambió el precio)
+Tipos_Movimiento
+id (Int, PK)
+tipo (Entrada | Salida | Transferencia | Entrega_EPP)
+descripcion
+Tipo_Entrega_EPP (enum)
+Ingreso | Recambio_Rotura | Recambio_Talle.
+Movimientos
+id (UUID, PK)
+id_tipo (FK a Tipos_Movimiento)
+id_responsable (FK a Responsables — quien cargó / entregó)
+id_deposito_origen (FK, nullable)
+id_deposito_destino (FK, nullable)
+id_proveedor (FK, nullable)
+es_devolucion (Boolean)
+motivo (Texto, nullable — observación de cabecera)
+fecha (Timestamp)
+nro_remito (Varchar)
+fotos_remito (Array de texto — URLs en Storage; una o más fotos, el remito puede tener varias hojas)
+cant_total_articulos (Int)
+tipo_entrega_epp (enum, nullable — solo Entrega EPP)
+id_empleado (FK a Responsables, nullable — solo Entrega EPP)
+fecha_recambio (Date, nullable — fecha + 30 días, solo Entrega EPP)
+Entrega EPP exige origen y destino distintos, tipo_entrega_epp, id_empleado, nro. de remito y al menos una foto de remito. tipo_entrega_epp, id_empleado y fecha_recambio van NULL en Entrada, Salida y Transferencia.
+Movimientos_Articulos (Detalle de Movimiento)
+id (UUID/Int, PK)
+id_movimiento (UUID/Int, FK a Movimientos)
+id_articulo (UUID/Int, FK a Articulos)
+cantidad (Int)
+observacion (Texto, Nullable)
+Si el movimiento es Entrega EPP, cada artículo debe tener is_epp = true.
+Tipos_notificacion
+id
+tipo
+Tipos: Creación, Eliminación, Modificación, Asignación de Rol, Bienvenida, Ingreso a plataforma, Recuperación de contraseña, Carga de movimiento, Carga masiva, Asignación de responsable, Desvinculación de responsable, Alerta_Recambio_EPP.
+Notificaciones
+id (UUID, PK)
+id_tipo_notificacion (FK)
+id_responsable
+id_responsable_extra ( en caso de creacion/modicicacion/asignación de rol/invitación/recuperación de contraseña)
+id_tabla_afectada
+id_valor_ajustado (aquí ya se le asociaría el valor que se afectó de la tabla afectada)
+fecha (tipo fecha y hora)
+descripcion ( acción que se realizó a detalle, si es de movimiento se indicara los depósitos que paso y la cantidad total de artículos que se movieron)
+metadata (jsonb)
+Mails (EmailJS)
+Correos transaccionales con las plantillas de Simetra. Los links de redirección usan siempre la URL de Vercel de la plataforma, nunca localhost.
+•Código de ingreso (registro).
+•Recuperar contraseña (enlace a Vercel).
+•Alerta de recambio EPP: al empleado (su mail) y al responsable que cargó esa Entrega EPP, cuando se cumplen los 30 días.
+Stack Tecnológico y Arquitectura del Sistema
+Supabase (BaaS - Backend as a Service):
+Actuará como el núcleo del backend de la plataforma (basado en PostgreSQL). Se encargará de la persistencia de datos relacionales, la gestión de autenticación de usuarios (Auth) y el almacenamiento de archivos estáticos mediante Supabase Storage (para las imágenes de los remitos). Además, se hará uso intensivo de Funciones y Triggers automáticos a nivel de base de datos para asegurar la integridad de la información y disparar eventos en tiempo real (ej. registro de notificaciones y cálculo de inventario).
+Node.js (Entorno de Ejecución / Middleware):
+Servirá como entorno de ejecución para la lógica de servidor, facilitando la conexión segura y la orquestación de reglas de negocio complejas en conjunto con la base de datos de Supabase.
+EmailJS (Infraestructura de Mensajería):
+Plataforma integrada para la orquestación y envío de correos electrónicos transaccionales. Trabajará en conjunto con los triggers de la base de datos para enviar plantillas dinámicas (templates) de forma automatizada, tales como invitaciones a la plataforma y enlaces para la recuperación de credenciales.
+Tailwind CSS (Framework de Estilos):
+Utilizado para la construcción de la Interfaz de Usuario (UI). Permitirá un desarrollo ágil y escalable mediante un sistema de clases utilitarias, garantizando que la plataforma sea 100% responsiva y mantenga un diseño coherente y profesional.
+Framer Motion / Motion (Librería de Animaciones UX/UI):
+Implementado para optimizar la Experiencia de Usuario (UX) a través de micro-interacciones. Se encargará de las transiciones de estado, animaciones de carga (loaders), el comportamiento fluido del sidebar y el enrutado entre vistas, proporcionando una percepción de sistema moderno y de alta respuesta (Single Page Application).
+Vercel (Hosting, CI/CD e Infraestructura Edge):
+Plataforma en la nube seleccionada para el despliegue del frontend de la aplicación. Proveerá integración y despliegue continuo (CI/CD), resolución rápida mediante su red global, provisión de certificados SSL automáticos y la gestión del dominio principal para el acceso de los usuarios a la plataforma.
+Estructura de Carpetas y Organización del Código
+Para garantizar una arquitectura escalable, limpia y modular (Vite + React, SPA), el proyecto se organiza así:
+gestion-stock/
+├── public/                          # Archivos estáticos públicos (logos, favicon, etc.)
+├── src/
+│   ├── App.jsx                      # Rutas de React Router y gates de sesión/rol
+│   ├── main.jsx                     # Entrada de Vite
+│   ├── app/
+│   │   ├── autentication/           # Grupo de rutas de autenticación
+│   │   │   ├── login/               # Página de Login
+│   │   │   ├── registro/            # Página de Registro / código de ingreso
+│   │   │   └── recuperar/           # Página de Recuperación de contraseña
+│   │   └── layouts/                 # Layout global
+│   │       ├── Navbar/              # Navbar responsive (PC | laptop | tlf)
+│   │       ├── ToastProvider/       # Toast de confirmación o aviso
+│   │       ├── Sidebar/             # Navegación (oculto para Responsable de depósito)
+│   │       ├── Footer/              # Derechos reservados
+│   │       └── Layout.jsx           # Navbar + Toast + Sidebar + Footer
+│   ├── app-spa/                     # Pantallas del área logueada
+│   ├── components/                  # Componentes reutilizables
+│   │   ├── ui/                      # Botones, inputs, tablas, badges
+│   │   ├── modals/                  # Formulario de carga y confirmaciones
+│   │   ├── layout/                  # Brand, campana, menú admin/perfil
+│   │   └── modules/                 # Artículos, movimientos, entregas, etc.
+│   ├── lib/                         # Integraciones
+│   │   ├── supabase/                # Cliente browser de Supabase
+│   │   └── emailjs/                 # Helpers y templates (código, recuperar, recambio EPP)
+│   ├── services/                    # Llamadas a la base (API / RPC)
+│   ├── hooks/                       # useAuth, useNotification, perfil
+│   └── utils/                       # Formato, validadores, rutas, Excel
+├── supabase/
+│   └── schema.sql                   # Esquema, RLS, triggers y funciones
+├── .env.local.example               # Plantilla de variables (local)
+├── .env.production                  # Claves públicas del cliente para el build de Vercel
+└── README.md                        # Instalación y arquitectura
+Rutas protegidas del sistema (área logueada):
+articulos/ — catálogo y carga; articulos/:id historial del artículo
+familias/ — familias y grupos; familias/:id gestionar grupos/artículos
+proveedores/
+depositos/
+movimientos/ — listado + inventario de artículos y de EPP
+movimientos/nuevo/ — paso a paso (entrada, salida, transferencia, entrega EPP)
+movimientos/:id — detalle
+entregas/ — historial de entregas EPP (acordeón + línea de tiempo)
+responsables/ — administración de responsables
+notificaciones/ — historial de notificaciones

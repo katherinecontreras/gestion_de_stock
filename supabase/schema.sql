@@ -85,6 +85,7 @@ ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Inhabilitacion';
 ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Asignacion_Responsable';
 ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Desvinculacion_Responsable';
 ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Alerta_Recambio_EPP';
+ALTER TYPE public.tipo_notificacion ADD VALUE IF NOT EXISTS 'Peticion_Depositos';
 ALTER TYPE public.tipo_movimiento ADD VALUE IF NOT EXISTS 'Entrega_EPP';
 
 DO $$ BEGIN
@@ -399,7 +400,8 @@ INSERT INTO public.tipos_notificacion (id, tipo, descripcion) VALUES
   (12, 'Inhabilitacion', 'Se inhabilitó una familia o un grupo'),
   (13, 'Asignacion_Responsable', 'Se asignó un responsable a un depósito'),
   (14, 'Desvinculacion_Responsable', 'Se quitó un responsable de un depósito'),
-  (15, 'Alerta_Recambio_EPP', 'Hay que recambiar EPP de un empleado')
+  (15, 'Alerta_Recambio_EPP', 'Hay que recambiar EPP de un empleado'),
+  (16, 'Peticion_Depositos', 'Un responsable actualizó los depósitos a su cargo')
 ON CONFLICT (id) DO UPDATE SET tipo = EXCLUDED.tipo, descripcion = EXCLUDED.descripcion;
 
 SELECT setval(pg_get_serial_sequence('public.roles', 'id'), (SELECT MAX(id) FROM public.roles));
@@ -3678,6 +3680,7 @@ CREATE POLICY notif_admin_all ON public.notificaciones
   FOR SELECT TO authenticated
   USING (
     public.fn_es_administrador()
+    OR public.fn_es_vista_descarga()
     OR (
       id_tipo_notificacion = (SELECT id FROM public.tipos_notificacion WHERE tipo = 'Bienvenida')
       AND (id_responsable = public.fn_responsable_id_actual()
@@ -3694,6 +3697,26 @@ CREATE POLICY notif_admin_all ON public.notificaciones
         public.fn_es_administrador()
         OR (metadata ->> 'id_deposito_origen')::uuid IN (SELECT public.fn_depositos_del_responsable())
         OR (metadata ->> 'id_deposito_destino')::uuid IN (SELECT public.fn_depositos_del_responsable())
+      )
+    )
+    OR (
+      id_tipo_notificacion = (SELECT id FROM public.tipos_notificacion WHERE tipo = 'Alerta_Recambio_EPP')
+      AND (
+        public.fn_es_administrador()
+        OR id_responsable = public.fn_responsable_id_actual()
+        OR id_responsable_extra = public.fn_responsable_id_actual()
+        OR (metadata ->> 'id_deposito')::uuid IN (SELECT public.fn_depositos_del_responsable())
+      )
+    )
+    OR (
+      id_tipo_notificacion IN (
+        SELECT id FROM public.tipos_notificacion
+        WHERE tipo IN ('Peticion_Depositos', 'Asignacion_Responsable', 'Desvinculacion_Responsable')
+      )
+      AND (
+        public.fn_es_administrador()
+        OR id_responsable = public.fn_responsable_id_actual()
+        OR id_responsable_extra = public.fn_responsable_id_actual()
       )
     )
   );
@@ -3758,5 +3781,498 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.notificaciones_leidas;
   END IF;
 END $$;
+
+CREATE OR REPLACE FUNCTION public.rpc_actualizar_mis_depositos(p_depositos uuid[])
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+  v_nombre text;
+  v_ids uuid[];
+  v_antes uuid[] := ARRAY[]::uuid[];
+  v_deposito uuid;
+  v_codigo text;
+  v_dep_nombre text;
+  v_added integer := 0;
+  v_removed integer := 0;
+  v_agregados text := '';
+  v_quitados text := '';
+BEGIN
+  IF public.fn_es_administrador() OR public.fn_es_vista_descarga() THEN
+    RAISE EXCEPTION 'Solo un responsable de depósito puede administrar sus depósitos';
+  END IF;
+  IF NOT public.fn_es_responsable_deposito() THEN
+    RAISE EXCEPTION 'Solo un responsable de depósito puede administrar sus depósitos';
+  END IF;
+
+  v_id := public.fn_responsable_id_actual();
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'No hay un responsable activo en la sesión';
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT x), ARRAY[]::uuid[])
+  INTO v_ids
+  FROM unnest(COALESCE(p_depositos, ARRAY[]::uuid[])) AS x
+  WHERE x IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM public.depositos d
+      WHERE d.id = x AND d.estado = 'activo'
+    );
+
+  IF COALESCE(array_length(v_ids, 1), 0) < 1 THEN
+    RAISE EXCEPTION 'Tenés que quedar a cargo de al menos un depósito activo';
+  END IF;
+
+  SELECT COALESCE(array_agg(dr.id_deposito), ARRAY[]::uuid[])
+  INTO v_antes
+  FROM public.depositos_responsables dr
+  WHERE dr.id_responsable = v_id;
+
+  DELETE FROM public.depositos_responsables
+  WHERE id_responsable = v_id
+    AND NOT (id_deposito = ANY (v_ids));
+
+  INSERT INTO public.depositos_responsables (id_deposito, id_responsable)
+  SELECT u.id_deposito, v_id
+  FROM unnest(v_ids) AS u(id_deposito)
+  ON CONFLICT (id_deposito, id_responsable) DO NOTHING;
+
+  v_nombre := COALESCE(public.fn_nombre_responsable(v_id), 'un responsable');
+
+  FOREACH v_deposito IN ARRAY v_ids
+  LOOP
+    IF NOT (v_deposito = ANY (COALESCE(v_antes, ARRAY[]::uuid[]))) THEN
+      v_added := v_added + 1;
+      SELECT d.codigo, d.nombre INTO v_codigo, v_dep_nombre
+      FROM public.depositos d WHERE d.id = v_deposito;
+      v_agregados := v_agregados || format('%s – %s; ', v_codigo, v_dep_nombre);
+      PERFORM public.fn_insertar_notificacion(
+        'Asignacion_Responsable',
+        format('Se asignó a %s como responsable del depósito %s – %s.', v_nombre, v_codigo, v_dep_nombre),
+        'depositos',
+        v_deposito,
+        v_id,
+        v_id,
+        jsonb_build_object('id_deposito', v_deposito, 'id_responsable_asignado', v_id, 'origen', 'autoasignacion')
+      );
+    END IF;
+  END LOOP;
+
+  FOREACH v_deposito IN ARRAY COALESCE(v_antes, ARRAY[]::uuid[])
+  LOOP
+    IF NOT (v_deposito = ANY (v_ids)) THEN
+      v_removed := v_removed + 1;
+      SELECT d.codigo, d.nombre INTO v_codigo, v_dep_nombre
+      FROM public.depositos d WHERE d.id = v_deposito;
+      v_quitados := v_quitados || format('%s – %s; ', v_codigo, v_dep_nombre);
+      PERFORM public.fn_insertar_notificacion(
+        'Desvinculacion_Responsable',
+        format('Se desvinculó a %s del depósito %s – %s.', v_nombre, v_codigo, v_dep_nombre),
+        'depositos',
+        v_deposito,
+        v_id,
+        v_id,
+        jsonb_build_object('id_deposito', v_deposito, 'id_responsable_desvinculado', v_id, 'origen', 'autoasignacion')
+      );
+    END IF;
+  END LOOP;
+
+  IF v_added > 0 OR v_removed > 0 THEN
+    PERFORM public.fn_insertar_notificacion(
+      'Peticion_Depositos',
+      format(
+        '%s actualizó sus depósitos. Agregó: %sQuitó: %s',
+        v_nombre,
+        CASE WHEN v_agregados = '' THEN 'ninguno. ' ELSE v_agregados END,
+        CASE WHEN v_quitados = '' THEN 'ninguno.' ELSE rtrim(v_quitados) END
+      ),
+      'depositos',
+      NULL,
+      v_id,
+      v_id,
+      jsonb_build_object(
+        'agregados', v_added,
+        'quitados', v_removed,
+        'ids', to_jsonb(v_ids)
+      )
+    );
+  END IF;
+
+  RETURN jsonb_build_object('assigned', v_added, 'removed', v_removed);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rpc_actualizar_mis_depositos(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_actualizar_mis_depositos(uuid[]) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_procesar_alertas_recambio()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid;
+  v_row record;
+  v_notif uuid;
+  v_creadas integer := 0;
+  v_pendientes jsonb := '[]'::jsonb;
+  v_articulos text;
+  v_ya uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Tenés que iniciar sesión';
+  END IF;
+
+  v_actor := public.fn_responsable_id_actual();
+
+  FOR v_row IN
+    SELECT
+      i.id_empleado,
+      i.id_deposito,
+      min(i.fecha_recambio) AS fecha_recambio,
+      (array_agg(i.id_movimiento ORDER BY i.fecha_entrega DESC NULLS LAST))[1] AS id_movimiento,
+      (array_agg(m.id_responsable ORDER BY i.fecha_entrega DESC NULLS LAST))[1] AS id_responsable,
+      max(e.nombre) AS emp_nombre,
+      max(e.apellido) AS emp_apellido,
+      max(e.dni) AS emp_dni,
+      max(e.email) AS emp_email,
+      max(r.nombre) AS resp_nombre,
+      max(r.apellido) AS resp_apellido,
+      max(r.email) AS resp_email,
+      max(d.codigo) AS dep_codigo,
+      max(d.nombre) AS dep_nombre,
+      string_agg(a.codigo || ' – ' || a.nombre || ' (' || i.cantidad::text || ')', ', ' ORDER BY a.codigo) AS articulos
+    FROM public.inventario_epp_personal i
+    JOIN public.empleados e ON e.id = i.id_empleado
+    JOIN public.depositos d ON d.id = i.id_deposito
+    JOIN public.articulos a ON a.id = i.id_articulo
+    LEFT JOIN public.movimientos m ON m.id = i.id_movimiento
+    LEFT JOIN public.responsables r ON r.id = m.id_responsable
+    WHERE i.fecha_recambio IS NOT NULL
+      AND i.fecha_recambio <= CURRENT_DATE
+    GROUP BY i.id_empleado, i.id_deposito
+  LOOP
+    v_ya := NULL;
+    SELECT n.id
+    INTO v_ya
+    FROM public.notificaciones n
+    JOIN public.tipos_notificacion t ON t.id = n.id_tipo_notificacion
+    WHERE t.tipo = 'Alerta_Recambio_EPP'
+      AND n.metadata ->> 'id_empleado' = v_row.id_empleado::text
+      AND n.metadata ->> 'id_deposito' = v_row.id_deposito::text
+      AND n.metadata ->> 'fecha_recambio' = v_row.fecha_recambio::text
+    LIMIT 1;
+
+    IF v_ya IS NULL THEN
+      v_articulos := COALESCE(v_row.articulos, 'artículos EPP');
+      v_notif := public.fn_insertar_notificacion(
+        'Alerta_Recambio_EPP',
+        format(
+          'Hay que recambiar EPP de %s %s (DNI %s) en el depósito %s – %s. Artículos: %s. Fecha de recambio: %s.',
+          COALESCE(v_row.emp_nombre, ''),
+          COALESCE(v_row.emp_apellido, ''),
+          COALESCE(v_row.emp_dni, '—'),
+          COALESCE(v_row.dep_codigo, '—'),
+          COALESCE(v_row.dep_nombre, '—'),
+          v_articulos,
+          v_row.fecha_recambio
+        ),
+        'movimientos',
+        v_row.id_movimiento,
+        COALESCE(v_row.id_responsable, v_actor),
+        v_row.id_responsable,
+        jsonb_build_object(
+          'id_empleado', v_row.id_empleado,
+          'id_deposito', v_row.id_deposito,
+          'id_movimiento', v_row.id_movimiento,
+          'fecha_recambio', v_row.fecha_recambio,
+          'articulos', v_articulos,
+          'empleado_nombre', btrim(concat_ws(' ', v_row.emp_nombre, v_row.emp_apellido)),
+          'empleado_email', v_row.emp_email,
+          'responsable_nombre', btrim(concat_ws(' ', v_row.resp_nombre, v_row.resp_apellido)),
+          'responsable_email', v_row.resp_email,
+          'deposito', format('%s – %s', v_row.dep_codigo, v_row.dep_nombre),
+          'mail_enviado', false
+        )
+      );
+      v_creadas := v_creadas + 1;
+    ELSE
+      v_notif := v_ya;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.notificaciones n
+      WHERE n.id = v_notif
+        AND COALESCE((n.metadata ->> 'mail_enviado')::boolean, false) = false
+    )
+      AND (
+        public.fn_es_administrador()
+        OR public.fn_es_vista_descarga()
+        OR v_row.id_responsable = v_actor
+      )
+    THEN
+      v_pendientes := v_pendientes || jsonb_build_array(jsonb_build_object(
+        'id_notificacion', v_notif,
+        'empleado_email', v_row.emp_email,
+        'empleado_nombre', btrim(concat_ws(' ', v_row.emp_nombre, v_row.emp_apellido)),
+        'responsable_email', v_row.resp_email,
+        'responsable_nombre', btrim(concat_ws(' ', v_row.resp_nombre, v_row.resp_apellido)),
+        'deposito', format('%s – %s', v_row.dep_codigo, v_row.dep_nombre),
+        'articulos', v_row.articulos,
+        'fecha_recambio', v_row.fecha_recambio,
+        'dni', v_row.emp_dni
+      ));
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('creadas', v_creadas, 'pendientes', v_pendientes);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rpc_procesar_alertas_recambio() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_procesar_alertas_recambio() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_marcar_alerta_recambio_enviada(p_ids uuid[])
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Tenés que iniciar sesión';
+  END IF;
+  UPDATE public.notificaciones n
+  SET metadata = jsonb_set(COALESCE(n.metadata, '{}'::jsonb), '{mail_enviado}', 'true'::jsonb)
+  WHERE n.id = ANY (COALESCE(p_ids, ARRAY[]::uuid[]));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rpc_marcar_alerta_recambio_enviada(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_marcar_alerta_recambio_enviada(uuid[]) TO authenticated;
+
+GRANT EXECUTE ON FUNCTION public.rpc_depositos_activos_registro() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_actualizar_responsable(
+  p_id uuid,
+  p_nombre text,
+  p_apellido text,
+  p_dni text,
+  p_rol text,
+  p_estado text,
+  p_depositos uuid[]
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid;
+  v_rol_id smallint;
+  v_rol_tipo public.tipo_rol;
+  v_antes public.responsables%ROWTYPE;
+  v_antes_tipo public.tipo_rol;
+  v_estado public.estado_entidad;
+  v_otros_admin integer;
+  v_ids uuid[] := ARRAY[]::uuid[];
+  v_antes_dep uuid[] := ARRAY[]::uuid[];
+  v_deposito uuid;
+  v_codigo text;
+  v_dep_nombre text;
+  v_nombre text;
+  v_added integer := 0;
+  v_removed integer := 0;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Tenés que iniciar sesión';
+  END IF;
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede editar responsables';
+  END IF;
+
+  v_actor := public.fn_responsable_id_actual();
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'No hay un administrador activo en la sesión';
+  END IF;
+
+  SELECT * INTO v_antes FROM public.responsables WHERE id = p_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El responsable no existe';
+  END IF;
+
+  SELECT ro.tipo INTO v_antes_tipo
+  FROM public.roles ro
+  WHERE ro.id = v_antes.id_rol;
+
+  SELECT ro.id, ro.tipo INTO v_rol_id, v_rol_tipo
+  FROM public.roles ro
+  WHERE ro.tipo::text = btrim(p_rol);
+  IF v_rol_id IS NULL THEN
+    RAISE EXCEPTION 'Rol inválido';
+  END IF;
+
+  v_estado := CASE WHEN btrim(p_estado) = 'inactivo' THEN 'inactivo'::public.estado_entidad ELSE 'activo'::public.estado_entidad END;
+
+  SELECT count(*) INTO v_otros_admin
+  FROM public.responsables r
+  JOIN public.roles ro ON ro.id = r.id_rol
+  WHERE ro.tipo = 'Administrador'
+    AND r.estado = 'activo'
+    AND r.id <> p_id;
+
+  IF v_antes_tipo = 'Administrador' AND v_antes.estado = 'activo' AND v_otros_admin = 0 THEN
+    IF v_rol_tipo IS DISTINCT FROM 'Administrador' OR v_estado = 'inactivo' THEN
+      RAISE EXCEPTION 'No podés dejar la plataforma sin un administrador activo';
+    END IF;
+  END IF;
+
+  IF v_rol_tipo = 'Responsable_Deposito' THEN
+    SELECT COALESCE(array_agg(DISTINCT x), ARRAY[]::uuid[])
+    INTO v_ids
+    FROM unnest(COALESCE(p_depositos, ARRAY[]::uuid[])) AS x
+    WHERE x IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM public.depositos d
+        WHERE d.id = x AND d.estado = 'activo'
+      );
+    IF COALESCE(array_length(v_ids, 1), 0) < 1 THEN
+      RAISE EXCEPTION 'Un responsable de depósito tiene que tener al menos un depósito activo';
+    END IF;
+  END IF;
+
+  UPDATE public.responsables
+  SET
+    nombre = btrim(p_nombre),
+    apellido = btrim(p_apellido),
+    dni = btrim(p_dni),
+    id_rol = v_rol_id,
+    estado = v_estado,
+    updated_at = now()
+  WHERE id = p_id;
+
+  SELECT COALESCE(array_agg(dr.id_deposito), ARRAY[]::uuid[])
+  INTO v_antes_dep
+  FROM public.depositos_responsables dr
+  WHERE dr.id_responsable = p_id;
+
+  DELETE FROM public.depositos_responsables
+  WHERE id_responsable = p_id
+    AND NOT (id_deposito = ANY (COALESCE(v_ids, ARRAY[]::uuid[])));
+
+  IF COALESCE(array_length(v_ids, 1), 0) > 0 THEN
+    INSERT INTO public.depositos_responsables (id_deposito, id_responsable)
+    SELECT u.id_deposito, p_id
+    FROM unnest(v_ids) AS u(id_deposito)
+    ON CONFLICT (id_deposito, id_responsable) DO NOTHING;
+  END IF;
+
+  v_nombre := COALESCE(public.fn_nombre_responsable(p_id), 'un responsable');
+
+  FOREACH v_deposito IN ARRAY COALESCE(v_ids, ARRAY[]::uuid[])
+  LOOP
+    IF NOT (v_deposito = ANY (COALESCE(v_antes_dep, ARRAY[]::uuid[]))) THEN
+      v_added := v_added + 1;
+      SELECT d.codigo, d.nombre INTO v_codigo, v_dep_nombre
+      FROM public.depositos d WHERE d.id = v_deposito;
+      PERFORM public.fn_insertar_notificacion(
+        'Asignacion_Responsable',
+        format('Se asignó a %s como responsable del depósito %s – %s.', v_nombre, v_codigo, v_dep_nombre),
+        'depositos',
+        v_deposito,
+        v_actor,
+        p_id,
+        jsonb_build_object('id_deposito', v_deposito, 'id_responsable_asignado', p_id, 'origen', 'admin')
+      );
+    END IF;
+  END LOOP;
+
+  FOREACH v_deposito IN ARRAY COALESCE(v_antes_dep, ARRAY[]::uuid[])
+  LOOP
+    IF NOT (v_deposito = ANY (COALESCE(v_ids, ARRAY[]::uuid[]))) THEN
+      v_removed := v_removed + 1;
+      SELECT d.codigo, d.nombre INTO v_codigo, v_dep_nombre
+      FROM public.depositos d WHERE d.id = v_deposito;
+      PERFORM public.fn_insertar_notificacion(
+        'Desvinculacion_Responsable',
+        format('Se desvinculó a %s del depósito %s – %s.', v_nombre, v_codigo, v_dep_nombre),
+        'depositos',
+        v_deposito,
+        v_actor,
+        p_id,
+        jsonb_build_object('id_deposito', v_deposito, 'id_responsable_desvinculado', p_id, 'origen', 'admin')
+      );
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('assigned', v_added, 'removed', v_removed);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rpc_actualizar_responsable(uuid, text, text, text, text, text, uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_actualizar_responsable(uuid, text, text, text, text, text, uuid[]) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.rpc_eliminar_responsable(p_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid;
+  v_tipo public.tipo_rol;
+  v_estado public.estado_entidad;
+  v_otros_admin integer;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Tenés que iniciar sesión';
+  END IF;
+  IF NOT public.fn_es_administrador() THEN
+    RAISE EXCEPTION 'Solo un administrador puede eliminar responsables';
+  END IF;
+
+  v_actor := public.fn_responsable_id_actual();
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'No hay un administrador activo en la sesión';
+  END IF;
+  IF v_actor = p_id THEN
+    RAISE EXCEPTION 'No podés eliminarte a vos mismo';
+  END IF;
+
+  SELECT ro.tipo, r.estado INTO v_tipo, v_estado
+  FROM public.responsables r
+  JOIN public.roles ro ON ro.id = r.id_rol
+  WHERE r.id = p_id;
+  IF v_tipo IS NULL THEN
+    RAISE EXCEPTION 'El responsable no existe';
+  END IF;
+
+  SELECT count(*) INTO v_otros_admin
+  FROM public.responsables r
+  JOIN public.roles ro ON ro.id = r.id_rol
+  WHERE ro.tipo = 'Administrador'
+    AND r.estado = 'activo'
+    AND r.id <> p_id;
+
+  IF v_tipo = 'Administrador' AND v_estado = 'activo' AND v_otros_admin = 0 THEN
+    RAISE EXCEPTION 'No podés dejar la plataforma sin un administrador activo';
+  END IF;
+
+  BEGIN
+    DELETE FROM public.responsables WHERE id = p_id;
+  EXCEPTION
+    WHEN foreign_key_violation THEN
+      RAISE EXCEPTION 'No se puede borrar: este responsable tiene historial. Inactivalo si no querés que entre.';
+  END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.rpc_eliminar_responsable(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_eliminar_responsable(uuid) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';

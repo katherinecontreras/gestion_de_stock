@@ -4,6 +4,7 @@ import { Brand } from "@/components/layout/brand";
 import { Campana } from "@/components/layout/campana";
 import { AdminMenu } from "@/components/layout/admin-menu";
 import { PerfilMenu } from "@/components/layout/perfil-menu";
+import { AdministrarDepositosModal } from "@/components/modals/administrar-depositos-modal";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { LogoutButton } from "./logout-button";
 import { ResponsableDesktopNav, ResponsableMobileMenu } from "./responsable-nav";
@@ -12,8 +13,10 @@ export function Navbar() {
     const { pathname } = useLocation();
     const { perfil, loading } = usePerfilSesion();
     const [openMenu, setOpenMenu] = useState(null);
+    const [depositosOpen, setDepositosOpen] = useState(false);
     const isResponsable = Boolean(perfil?.esResponsableDeposito);
     const showAdminMenu = Boolean(perfil?.esAdministrador || perfil?.esVistaDescarga);
+    const showDepositos = isResponsable && !perfil?.esAdministrador && !perfil?.esVistaDescarga;
 
     useEffect(() => {
         setOpenMenu(null);
@@ -38,13 +41,12 @@ export function Navbar() {
                 ) : null}
                 {isResponsable ? (
                     <>
-                        <div className="hidden lg:block">
-                            <PerfilMenu
-                                open={openMenu === "perfil"}
-                                onOpen={() => setOpenMenu("perfil")}
-                                onClose={() => setOpenMenu(null)}
-                            />
-                        </div>
+                        <PerfilMenu
+                            open={openMenu === "perfil"}
+                            onOpen={() => setOpenMenu("perfil")}
+                            onClose={() => setOpenMenu(null)}
+                            onAdministrarDepositos={showDepositos ? () => setDepositosOpen(true) : undefined}
+                        />
                         <div className="hidden lg:block">
                             <LogoutButton />
                         </div>
@@ -67,6 +69,12 @@ export function Navbar() {
                     </>
                 )}
             </div>
+            {showDepositos ? (
+                <AdministrarDepositosModal
+                    open={depositosOpen}
+                    onClose={() => setDepositosOpen(false)}
+                />
+            ) : null}
         </header>
     );
 }
