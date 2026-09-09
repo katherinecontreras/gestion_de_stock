@@ -124,7 +124,7 @@ export function explainArticuloError(errorOrMessage, code) {
         : errorText(errorOrMessage);
     const resolvedCode = code ?? errorOrMessage?.code;
     if (resolvedCode === "23505") {
-        return "Ya existe un artículo con ese código.";
+        return "Ese código de artículo ya existe. El código tiene que ser único.";
     }
     if (resolvedCode === "42501" || /row-level security|permission denied/i.test(message)) {
         return "No tenés permiso para gestionar artículos.";
@@ -333,12 +333,26 @@ export async function findArticuloPorCodigo(codigo, ignoreId) {
     const supabase = createBrowserClient();
     const { data, error } = await supabase
         .from("articulos")
-        .select("id, codigo, nombre, estado")
-        .ilike("codigo", key)
-        .maybeSingle();
+        .select("id, codigo, nombre, estado, grupos:id_grupo ( codigo, descripcion, familias:id_familia ( codigo, descripcion ) )")
+        .ilike("codigo", key.replace(/[%_]/g, "\\$&"))
+        .limit(2);
     if (error) throw error;
-    if (!data || data.id === ignoreId) return null;
-    return data;
+    const row = (data ?? []).find((item) => item.id !== ignoreId) ?? null;
+    if (!row) return null;
+    const grupo = Array.isArray(row.grupos) ? row.grupos[0] : row.grupos;
+    const familia = grupo
+        ? (Array.isArray(grupo.familias) ? grupo.familias[0] : grupo.familias)
+        : null;
+    return {
+        id: row.id,
+        codigo: row.codigo,
+        nombre: row.nombre,
+        estado: row.estado,
+        grupo_codigo: grupo?.codigo ?? "",
+        grupo_descripcion: grupo?.descripcion ?? "",
+        familia_codigo: familia?.codigo ?? "",
+        familia_descripcion: familia?.descripcion ?? "",
+    };
 }
 
 export async function getArticulo(id) {

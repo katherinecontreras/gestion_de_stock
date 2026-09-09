@@ -12,7 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { TableAppearRow, TableGhost, TableShell } from "@/components/ui/table";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { useToast } from "@/app/layouts/ToastProvider";
-import { createFamilia, eliminarFamilia, explainFamiliaError, listFamiliasCodigos, listFamiliasConGrupos, listFamiliasResumen, nextCodigoDesdeActivos, updateFamilia, upsertGrupos, } from "@/services/familias";
+import { createFamilia, eliminarFamilia, explainFamiliaError, findFamiliaPorCodigo, listFamiliasCodigos, listFamiliasConGrupos, listFamiliasResumen, nextCodigoDesdeActivos, updateFamilia, upsertGrupos, } from "@/services/familias";
+import { hintCodigoUnico, mensajeFamiliaCodigoOcupado } from "@/utils/codigo-unico";
 import { downloadFamiliasExcel, parseFamiliasExcel } from "@/utils/excel-familias";
 import { formatCurrency } from "@/utils/format";
 import { SPA_PATHS } from "@/utils/routes";
@@ -142,8 +143,9 @@ export function FamiliasScreen() {
             setCreateError("Completá código y descripción.");
             return;
         }
-        if (createCodeOwner) {
-            setCreateError(`El código “${createCode.trim()}” pertenece a la familia “${createCodeOwner.descripcion}”.`);
+        const owner = createCodeOwner ?? await findFamiliaPorCodigo(createCode);
+        if (owner) {
+            setCreateError(mensajeFamiliaCodigoOcupado(owner, createCode));
             return;
         }
         setSaving(true);
@@ -168,8 +170,9 @@ export function FamiliasScreen() {
             notify("Completá código y descripción.", "error");
             return;
         }
-        if (draftCodeOwner) {
-            notify(`El código “${draft.codigo.trim()}” pertenece a la familia “${draftCodeOwner.descripcion}”.`, "error");
+        const owner = draftCodeOwner ?? await findFamiliaPorCodigo(draft.codigo, draft.id);
+        if (owner) {
+            notify(mensajeFamiliaCodigoOcupado(owner, draft.codigo), "error");
             return;
         }
         setSaving(true);
@@ -482,7 +485,7 @@ export function FamiliasScreen() {
           {createError ? <Alert>{createError}</Alert> : null}
           {createCodeOwner?.estado === "inactivo" ? (<div className="rounded-control border border-app-input bg-app-subtle px-3 py-3 text-sm text-app-secondarytext">
               <p>
-                Ya existe una familia con el código “{createCode.trim()}” (inactiva: {createCodeOwner.descripcion}). Si querés usar ese código, reactivá esa familia o eliminala. Si no, cambiá el código.
+                {mensajeFamiliaCodigoOcupado(createCodeOwner, createCode)} Reactivala o eliminala, o usá otro código.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button" disabled={saving} onClick={() => void handleReactivar(createCodeOwner)}>
@@ -493,10 +496,10 @@ export function FamiliasScreen() {
                 </Button>
               </div>
             </div>) : createCodeOwner ? (<Alert>
-              Ya existe una familia con el código “{createCode.trim()}” ({createCodeOwner.descripcion}).
+              {mensajeFamiliaCodigoOcupado(createCodeOwner, createCode)}
             </Alert>) : null}
           <Input label="Código" value={createCode} maxLength={10} onChange={(event) => setCreateCode(event.target.value)} required hint={<span className="text-xs text-app-mutedtext">
-                Sugerido: {suggestedCode}
+                Sugerido: {suggestedCode}. {hintCodigoUnico()}
               </span>}/>
           <Input label="Descripción" value={createName} maxLength={255} onChange={(event) => setCreateName(event.target.value)} required/>
         </form>

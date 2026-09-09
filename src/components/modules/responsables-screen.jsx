@@ -289,7 +289,7 @@ export function ResponsablesScreen() {
                 open={Boolean(draft)}
                 title={draft ? `Editar · ${draft.nombre} ${draft.apellido}` : "Editar responsable"}
                 description="El mail es el de ingreso: se muestra y no se cambia. Si el rol es responsable de depósito, asigná al menos uno."
-                className="max-h-[90vh] max-w-3xl overflow-y-auto"
+                className="max-w-3xl"
                 onClose={() => !saving && setDraft(null)}
                 footer={(
                     <>

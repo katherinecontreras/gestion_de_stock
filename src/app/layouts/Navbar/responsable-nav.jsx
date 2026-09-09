@@ -22,13 +22,21 @@ export function ResponsableDesktopNav() {
                         key={item.href}
                         to={item.href}
                         className={cn(
-                            "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-app-secondarytext",
-                            "transition-colors duration-hover hover:bg-app-hover hover:text-app-primary",
-                            active && "bg-app-bg text-app-primary",
+                            "relative inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-app-secondarytext",
+                            "transition-colors duration-hover",
+                            !active && "hover:bg-app-hover hover:text-app-primary",
+                            active && "text-app-primary",
                         )}
                     >
-                        <Icon size={18} strokeWidth={1.7} />
-                        {item.label}
+                        {active ? (
+                            <motion.span
+                                layoutId="responsable-nav-active"
+                                className="absolute inset-0 rounded-xl bg-app-bg"
+                                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                            />
+                        ) : null}
+                        <Icon size={18} strokeWidth={1.7} className="relative z-10" />
+                        <span className="relative z-10">{item.label}</span>
                     </Link>
                 );
             })}
@@ -48,16 +56,27 @@ export function ResponsableMobileMenu({ open, onOpen, onClose, perfil, loading }
                 aria-expanded={open}
                 onClick={() => (open ? onClose() : onOpen())}
             >
-                {open ? <X size={24} strokeWidth={1.6} /> : <Menu size={24} strokeWidth={1.6} />}
+                <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                        key={open ? "close" : "open"}
+                        initial={{ opacity: 0, rotate: -80, scale: 0.75 }}
+                        animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                        exit={{ opacity: 0, rotate: 80, scale: 0.75 }}
+                        transition={{ duration: 0.16 }}
+                        className="inline-flex"
+                    >
+                        {open ? <X size={24} strokeWidth={1.6} /> : <Menu size={24} strokeWidth={1.6} />}
+                    </motion.span>
+                </AnimatePresence>
             </button>
             <AnimatePresence>
                 {open ? (
                     <motion.div
                         className="fixed inset-x-0 top-14 z-20 overflow-y-auto border-b border-app-border bg-app-surface shadow-modal lg:hidden"
-                        initial={{ y: "-12%", opacity: 0 }}
+                        initial={{ y: "-16%", opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: "-8%", opacity: 0 }}
-                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                        exit={{ y: "-10%", opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 34 }}
                     >
                         <nav className="flex flex-col gap-1 p-4" aria-label="Navegación">
                             {RESPONSABLE_NAV_ITEMS.map((item) => {

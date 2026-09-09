@@ -13,7 +13,7 @@ const MOVIMIENTO_LIST_SELECT = `
   deposito_origen:id_deposito_origen ( id, codigo, nombre ),
   deposito_destino:id_deposito_destino ( id, codigo, nombre ),
   proveedor:id_proveedor ( id, cod_proveedor, razon_social ),
-  empleado:id_empleado ( id, nombre, apellido, dni, email )
+  empleado:id_empleado ( id, nombre, apellido, dni )
 `;
 
 const MOVIMIENTO_DETALLE_SELECT = `
@@ -81,7 +81,6 @@ function mapMovimiento(row) {
                 nombre: empleado.nombre,
                 apellido: empleado.apellido,
                 dni: empleado.dni,
-                email: empleado.email,
                 etiqueta: `${empleado.nombre} ${empleado.apellido}`.trim(),
             }
             : null,
@@ -376,19 +375,19 @@ export async function listEmpleados(search = "") {
     const term = sanitizeSearch(search);
     let query = supabase
         .from("empleados")
-        .select("id, nombre, apellido, dni, email")
+        .select("id, nombre, apellido, dni")
         .order("apellido", { ascending: true })
         .order("nombre", { ascending: true })
         .limit(30);
     if (term) {
-        query = query.or(`nombre.ilike.%${term}%,apellido.ilike.%${term}%,dni.ilike.%${term}%,email.ilike.%${term}%`);
+        query = query.or(`nombre.ilike.%${term}%,apellido.ilike.%${term}%,dni.ilike.%${term}%`);
     }
     const { data, error } = await query;
     if (error) throw error;
     return data ?? [];
 }
 
-export async function createEmpleado({ nombre, apellido, dni, email }) {
+export async function createEmpleado({ nombre, apellido, dni }) {
     const supabase = createBrowserClient();
     const { data, error } = await supabase
         .from("empleados")
@@ -396,9 +395,8 @@ export async function createEmpleado({ nombre, apellido, dni, email }) {
             nombre: nombre.trim(),
             apellido: apellido.trim(),
             dni: dni.trim(),
-            email: email.trim(),
         })
-        .select("id, nombre, apellido, dni, email")
+        .select("id, nombre, apellido, dni")
         .single();
     if (error) {
         if (error.code === "23505") {

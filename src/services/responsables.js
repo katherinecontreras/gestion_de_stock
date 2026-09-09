@@ -68,6 +68,9 @@ export function explainResponsableError(errorOrMessage) {
     if (code === "42501" || /row-level security|permission denied/i.test(message)) {
         return "No tenés permiso para administrar responsables.";
     }
+    if (/rpc_actualizar_responsable|rpc_eliminar_responsable/i.test(message)) {
+        return "Falta el SQL de administración de responsables. Pegá el ajuste del chat y recargá.";
+    }
     return explainMissingDbFunction(message, message || "No se pudo completar la operación.");
 }
 

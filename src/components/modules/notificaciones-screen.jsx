@@ -68,7 +68,7 @@ function toneAccion(tipo) {
 }
 const SELECT_CLASS = "w-full rounded-control border border-app-input bg-app-surface px-3 py-2 text-sm text-app-primary focus:border-app-focus focus:ring-1 focus:ring-app-focus";
 function FilterSelect({ label, value, onChange, options, }) {
-    return (<label className="flex min-w-[11rem] flex-1 flex-col gap-1.5">
+    return (<label className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-[11rem]">
       <span className="text-xs font-medium text-app-secondarytext">{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)} className={SELECT_CLASS}>
         {options.map((option) => (<option key={option.value || option.label} value={option.value}>

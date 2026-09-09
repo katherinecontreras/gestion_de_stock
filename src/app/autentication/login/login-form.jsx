@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion } from "motion/react";
 import { LogIn } from "lucide-react";
 import { AuthDivider, AuthPrompt } from "@/components/layout/auth-card";
 import { Alert } from "@/components/ui/alert";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { createBrowserClient } from "@/lib/supabase";
+import { staggerContainer, staggerItem } from "@/utils/motion";
 import { APP_ROUTES, toAppEntry } from "@/utils/routes";
 import { digitsOnly } from "@/utils/validators";
 
@@ -80,39 +82,57 @@ export function LoginForm({ configured = true }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <motion.form
+      onSubmit={handleSubmit}
+      className="space-y-3"
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+    >
       {!configured ? (
-        <Alert>
-          Faltan las claves de Supabase. En local completalas en el archivo
-          .env. En Vercel tienen que estar en el build de producción.
-        </Alert>
+        <motion.div variants={staggerItem}>
+          <Alert>
+            Faltan las claves de Supabase. En local completalas en el archivo
+            .env. En Vercel tienen que estar en el build de producción.
+          </Alert>
+        </motion.div>
       ) : null}
-      {error ? <Alert>{error}</Alert> : null}
-      <Input
-        name="dni"
-        label="DNI"
-        autoComplete="username"
-        inputMode="numeric"
-        value={dni}
-        onChange={(event) => setDni(digitsOnly(event.target.value))}
-        required
-      />
-      <Input
-        name="password"
-        type="password"
-        label="Contraseña"
-        autoComplete="current-password"
-        required
-      />
-      <Button type="submit" className="mt-1 w-full" disabled={pending || !configured}>
-        {pending ? (
-          <Spinner className="h-4 w-4 text-white" />
-        ) : (
-          <LogIn size={16} strokeWidth={1.6} />
-        )}
-        {pending ? "Ingresando…" : "Ingresar"}
-      </Button>
-      <div className="space-y-3 pt-1">
+      {error ? (
+        <motion.div variants={staggerItem}>
+          <Alert>{error}</Alert>
+        </motion.div>
+      ) : null}
+      <motion.div variants={staggerItem}>
+        <Input
+          name="dni"
+          label="DNI"
+          autoComplete="username"
+          inputMode="numeric"
+          value={dni}
+          onChange={(event) => setDni(digitsOnly(event.target.value))}
+          required
+        />
+      </motion.div>
+      <motion.div variants={staggerItem}>
+        <Input
+          name="password"
+          type="password"
+          label="Contraseña"
+          autoComplete="current-password"
+          required
+        />
+      </motion.div>
+      <motion.div variants={staggerItem}>
+        <Button type="submit" className="mt-1 w-full" disabled={pending || !configured}>
+          {pending ? (
+            <Spinner className="h-4 w-4 text-white" />
+          ) : (
+            <LogIn size={16} strokeWidth={1.6} />
+          )}
+          {pending ? "Ingresando…" : "Ingresar"}
+        </Button>
+      </motion.div>
+      <motion.div className="space-y-3 pt-1" variants={staggerItem}>
         <AuthPrompt
           question="¿Olvidaste tu contraseña?"
           to={APP_ROUTES.recuperar}
@@ -124,7 +144,7 @@ export function LoginForm({ configured = true }) {
           to={APP_ROUTES.registro}
           action="Registrate"
         />
-      </div>
-    </form>
+      </motion.div>
+    </motion.form>
   );
 }

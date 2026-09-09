@@ -21,7 +21,7 @@ export function ToastProvider({ children }) {
       {children}
       <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2 px-4">
         <AnimatePresence>
-          {toasts.map((toast) => (<motion.div key={toast.id} initial={{ opacity: 0, scale: 0.96, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: -8 }} transition={{ duration: 0.18 }} className={`origin-top pointer-events-auto w-full max-w-md rounded-xl border px-4 py-3 text-center text-sm shadow-toast ${VARIANT_STYLES[toast.variant]}`} role="status">
+          {toasts.map((toast) => (<motion.div key={toast.id} initial={{ opacity: 0, scale: 0.94, y: -14 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: -8 }} transition={{ type: "spring", stiffness: 420, damping: 30 }} className={`origin-top pointer-events-auto w-full max-w-md rounded-xl border px-4 py-3 text-center text-sm shadow-toast ${VARIANT_STYLES[toast.variant]}`} role="status">
               {toast.message}
             </motion.div>))}
         </AnimatePresence>

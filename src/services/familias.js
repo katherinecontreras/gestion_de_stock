@@ -29,7 +29,7 @@ export function explainFamiliaError(errorOrMessage, code) {
         : errorText(errorOrMessage);
     const resolvedCode = code ?? errorOrMessage?.code;
     if (resolvedCode === "23505") {
-        return "Ya existe una familia con ese código.";
+        return "Ese código de familia ya existe. El código tiene que ser único.";
     }
     if (resolvedCode === "42501" || /row-level security|permission denied/i.test(message)) {
         return "No tenés permiso para gestionar familias.";
@@ -46,6 +46,20 @@ export async function listFamiliasResumen() {
         throw error;
     return (data ?? []);
 }
+export async function findFamiliaPorCodigo(codigo, ignoreId) {
+    const key = String(codigo ?? "").trim();
+    if (!key) return null;
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase
+        .from("familias")
+        .select("id, codigo, descripcion, estado")
+        .ilike("codigo", key.replace(/[%_]/g, "\\$&"))
+        .limit(2);
+    if (error) throw error;
+    const row = (data ?? []).find((item) => item.id !== ignoreId) ?? null;
+    return row;
+}
+
 export async function listFamiliasCodigos() {
     const supabase = createBrowserClient();
     const { data, error } = await supabase

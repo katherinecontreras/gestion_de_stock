@@ -28,6 +28,7 @@ import {
 } from "@/app-spa/screens";
 import { useAuth } from "@/hooks/use-auth";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
+import { fadeUp, pageTransition } from "@/utils/motion";
 import { APP_ROUTES, SPA_PATHS, toAppEntry } from "@/utils/routes";
 
 const RR_FUTURE = {
@@ -37,8 +38,15 @@ const RR_FUTURE = {
 
 function LoadingScreen() {
   return (
-    <div className="flex h-dvh items-center justify-center bg-app-bg text-sm text-app-mutedtext">
-      Cargando…
+    <div className="flex h-dvh items-center justify-center bg-app-bg">
+      <motion.p
+        className="text-sm text-app-mutedtext"
+        initial={{ opacity: 0.35 }}
+        animate={{ opacity: [0.35, 1, 0.35] }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+      >
+        Cargando…
+      </motion.p>
     </div>
   );
 }
@@ -93,10 +101,22 @@ function LegacyPagesRedirect() {
 }
 
 function AuthLayout() {
+  const location = useLocation();
   return (
-    <div className="h-dvh overflow-y-auto overflow-x-hidden overscroll-contain bg-app-bg">
-      <div className="mx-auto flex min-h-full w-full items-center justify-center px-4 py-6 sm:px-6 md:px-8 md:py-8">
-        <Outlet />
+    <div className="h-dvh overflow-x-hidden overflow-y-auto overscroll-contain bg-app-bg">
+      <div className="mx-auto flex min-h-full w-full max-w-full items-center justify-center px-3 py-6 sm:px-6 md:px-8 md:py-8">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={location.pathname}
+            className="flex w-full justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -129,10 +149,8 @@ function AppLayout() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          {...fadeUp}
+          transition={pageTransition}
         >
           <Outlet />
         </motion.div>
@@ -144,7 +162,7 @@ function AppLayout() {
 export default function App() {
   return (
     <ToastProvider>
-      <MotionConfig reducedMotion="never">
+      <MotionConfig reducedMotion="user">
         <BrowserRouter future={RR_FUTURE}>
           <Routes>
             <Route path="/" element={<RootRedirect />} />

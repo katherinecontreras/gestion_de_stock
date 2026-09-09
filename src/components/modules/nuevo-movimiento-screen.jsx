@@ -67,7 +67,7 @@ export function NuevoMovimientoScreen() {
     const [empleado, setEmpleado] = useState(null);
     const [empleadoSearch, setEmpleadoSearch] = useState("");
     const [empleadoHits, setEmpleadoHits] = useState([]);
-    const [altaEmpleado, setAltaEmpleado] = useState({ nombre: "", apellido: "", dni: "", email: "" });
+    const [altaEmpleado, setAltaEmpleado] = useState({ nombre: "", apellido: "", dni: "" });
     const [mostrarAltaEmpleado, setMostrarAltaEmpleado] = useState(false);
     const [selected, setSelected] = useState({});
     const [artSearchInput, setArtSearchInput] = useState("");
@@ -259,8 +259,8 @@ export function NuevoMovimientoScreen() {
 
     async function handleAltaEmpleado(event) {
         event.preventDefault();
-        if (!altaEmpleado.nombre.trim() || !altaEmpleado.apellido.trim() || !altaEmpleado.dni.trim() || !altaEmpleado.email.trim()) {
-            setError("Completá nombre, apellido, DNI y mail del empleado.");
+        if (!altaEmpleado.nombre.trim() || !altaEmpleado.apellido.trim() || !altaEmpleado.dni.trim()) {
+            setError("Completá nombre, apellido y DNI del empleado.");
             return;
         }
         try {
@@ -401,7 +401,7 @@ export function NuevoMovimientoScreen() {
                                     {key === "Entrada" && "Ingreso de mercadería a un depósito."}
                                     {key === "Salida" && "Egreso desde un depósito. Puede ser devolución a proveedor."}
                                     {key === "Transferencia" && "Traspaso interno entre depósitos."}
-                                    {key === "Entrega_EPP" && "Entrega de EPP a un empleado. Resta stock del origen."}
+                                    {key === "Entrega_EPP" && "Entrega de EPP a un empleado. Resta stock del origen. El recambio se programa a 6 meses."}
                                 </p>
                             </button>
                         );
@@ -460,6 +460,7 @@ export function NuevoMovimientoScreen() {
                                         label: optionLabel,
                                     }))}
                                 />
+                                <p className="text-sm text-app-mutedtext">La fecha de recambio se calcula sola: 6 meses desde el día de la entrega.</p>
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-sm font-medium text-app-secondarytext">Observación (opcional)</span>
                                     <textarea value={datos.motivo} onChange={(event) => setDatos({ ...datos, motivo: event.target.value })} rows={2} className={SELECT_CLASS} />
@@ -575,9 +576,9 @@ export function NuevoMovimientoScreen() {
                         </div>
                     </Card>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm font-medium text-app-primary">Total de artículos: {cantTotal}</p>
-                        <Button variant="secondary" onClick={() => setAddOpen(true)}>
+                        <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setAddOpen(true)}>
                             <Plus size={16} strokeWidth={1.6} />
                             Agregar más
                         </Button>
@@ -769,7 +770,7 @@ function EmpleadoPicker({ empleado, search, hits, alta, mostrarAlta, onSearch, o
             <p className="text-sm font-medium text-app-secondarytext">Empleado</p>
             {empleado ? (
                 <div className="flex items-center justify-between rounded-control border border-app-border bg-app-muted px-3 py-2 text-sm">
-                    <span>{empleado.nombre} {empleado.apellido} · DNI {empleado.dni} · {empleado.email}</span>
+                    <span>{empleado.nombre} {empleado.apellido} · DNI {empleado.dni}</span>
                     <Button variant="table" onClick={onClear}><X size={16} /></Button>
                 </div>
             ) : (
@@ -783,13 +784,13 @@ function EmpleadoPicker({ empleado, search, hits, alta, mostrarAlta, onSearch, o
                             {hits.map((row) => (
                                 <li key={row.id}>
                                     <button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-app-subtle" onClick={() => onPick(row)}>
-                                        {row.nombre} {row.apellido} · DNI {row.dni} · {row.email}
+                                        {row.nombre} {row.apellido} · DNI {row.dni}
                                     </button>
                                 </li>
                             ))}
                         </ul>
                     ) : search.trim() ? (
-                        <p className="text-sm text-app-mutedtext">No está. Dalo de alta con nombre, apellido, DNI y mail.</p>
+                        <p className="text-sm text-app-mutedtext">No está. Dalo de alta con nombre, apellido y DNI.</p>
                     ) : null}
                     <Button variant="secondary" onClick={onToggleAlta}>Alta de empleado</Button>
                     {mostrarAlta ? (
@@ -797,7 +798,6 @@ function EmpleadoPicker({ empleado, search, hits, alta, mostrarAlta, onSearch, o
                             <Input label="Nombre" value={alta.nombre} onChange={(event) => onAltaChange({ ...alta, nombre: event.target.value })} required />
                             <Input label="Apellido" value={alta.apellido} onChange={(event) => onAltaChange({ ...alta, apellido: event.target.value })} required />
                             <Input label="DNI" value={alta.dni} onChange={(event) => onAltaChange({ ...alta, dni: event.target.value })} required />
-                            <Input label="Mail" type="email" value={alta.email} onChange={(event) => onAltaChange({ ...alta, email: event.target.value })} required />
                             <div className="sm:col-span-2">
                                 <Button type="submit">Crear empleado</Button>
                             </div>

@@ -136,7 +136,7 @@ export function MovimientosScreen() {
                 }
             />
 
-            <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-app-muted p-1">
+            <div className="mb-4 flex gap-1 overflow-x-auto overscroll-x-contain rounded-xl bg-app-muted p-1">
                 {[
                     { id: "movimientos", label: "Movimientos" },
                     { id: "inventario", label: "Inventario de artículos" },
@@ -147,7 +147,7 @@ export function MovimientosScreen() {
                         type="button"
                         onClick={() => setVista(tab.id)}
                         className={cn(
-                            "rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-hover",
+                            "shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-hover",
                             vista === tab.id ? "bg-app-surface text-app-primary shadow-sm" : "text-app-secondarytext hover:text-app-primary",
                         )}
                     >

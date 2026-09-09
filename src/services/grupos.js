@@ -30,7 +30,7 @@ export function explainGrupoError(errorOrMessage, code) {
         : errorText(errorOrMessage);
     const resolvedCode = code ?? errorOrMessage?.code;
     if (resolvedCode === "23505") {
-        return "Ya existe un grupo con ese código en esta familia.";
+        return "Ese código de grupo ya existe en esta familia. El código tiene que ser único en la familia.";
     }
     if (resolvedCode === "42501" || /row-level security|permission denied/i.test(message)) {
         return "No tenés permiso para gestionar grupos.";
@@ -59,6 +59,27 @@ export async function listGruposResumen(idFamilia) {
         throw error;
     return (data ?? []);
 }
+export async function findGrupoPorCodigo(idFamilia, codigo, ignoreId) {
+    const key = String(codigo ?? "").trim();
+    if (!idFamilia || !key) return null;
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase
+        .from("grupos")
+        .select("id, id_familia, codigo, descripcion, estado, familias:id_familia ( codigo, descripcion )")
+        .eq("id_familia", idFamilia)
+        .ilike("codigo", key.replace(/[%_]/g, "\\$&"))
+        .limit(2);
+    if (error) throw error;
+    const row = (data ?? []).find((item) => item.id !== ignoreId) ?? null;
+    if (!row) return null;
+    const familia = Array.isArray(row.familias) ? row.familias[0] : row.familias;
+    return {
+        ...row,
+        familia_codigo: familia?.codigo ?? "",
+        familia_descripcion: familia?.descripcion ?? "",
+    };
+}
+
 export async function listGrupoCodigos(idFamilia) {
     const supabase = createBrowserClient();
     const { data, error } = await supabase

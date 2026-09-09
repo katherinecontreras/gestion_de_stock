@@ -7,7 +7,7 @@ Administrador: Carga, edición y baja de artículos, depósitos, proveedores, fa
 Responsable de Deposito: Ve los artículos, depósitos y movimientos de los depósitos que tenga asignados (puede ser más de uno) y puede cargar movimientos en esos depósitos, incluida la Entrega EPP. También ve el historial de esos artículos y el historial de entregas de sus depósitos. Un depósito puede tener varios responsables y un responsable puede estar asignado a más de un depósito. Si su estado es inactivo, no puede ingresar a la plataforma. No tiene sidebar ni tuerca: en el navbar ve Artículos, Depósitos, Movimientos e Historial de Entregas. Desde el ícono de perfil puede administrar sus depósitos (mínimo uno).
 Vista y descarga: Tiene acceso a toda la información de la plataforma igual que el Administrador (artículos, depósitos, proveedores, familias, movimientos, responsables, notificaciones e historial de entregas). Solo puede ver y descargar. Puede entrar al historial de un artículo y a “Ver grupos” de una familia, siempre en solo lectura. No puede crear, editar, eliminar, cargar (ni masiva ni individual), hacer movimientos ni ninguna otra acción de escritura. Navega con sidebar + tuerca + campana, igual que el Administrador.
 Empleado: Persona que recibe EPP. No es un rol de la tabla de responsables ni opera la plataforma: no inicia sesión, no tiene contraseña. Se guarda en la tabla empleados. Solo figura en entregas, inventario EPP e historial de entregas. No aparece como opción al registrarse. Solo se crea o se elige al cargar una Entrega EPP.
-Alta: en el movimiento se busca por nombre. En los resultados se ven nombre, apellido, DNI y mail para confirmar si es la misma persona. Si está, se selecciona. Si no, se crea en empleados con nombre, apellido, DNI y mail (sin Auth).
+Alta: en el movimiento se busca por nombre, apellido o DNI. En los resultados se ven nombre, apellido y DNI para confirmar si es la misma persona. Si está, se selecciona. Si no, se crea en empleados con nombre, apellido y DNI (sin Auth ni mail). El mail es solo de los usuarios que ingresan a la plataforma (tabla responsables).
 Estas son todas las páginas que tendrá la plataforma:
 Login
 Registro
@@ -134,7 +134,7 @@ Dos vistas de inventario en esta página (Administrador, Vista y descarga; el re
 •Inventario EPP: por depósito destino, artículos que está usando cada empleado, cantidades, días que faltan para el recambio y alerta en la fila si ya hay que recambiar.
 Detalle de Movimiento (Administrador, Vista y descarga y Responsable de depósito)
 Visualización de detalle del movimiento
-Al ingresar al detalle del movimiento se ven todos los datos del movimiento y abajo la tabla de artículos: familia, grupo, código, nombre, cantidad, observación. Si es Entrega EPP: tipo de entrega, empleado (nombre, apellido, DNI, mail), fecha de recambio y estado de recambio (pendiente / debe recambiarse / recambiado). Las fotos del remito pueden ser varias (el remito puede tener más de una hoja). Vista y descarga solo mira y puede ver las fotos; no carga ni edita.
+Al ingresar al detalle del movimiento se ven todos los datos del movimiento y abajo la tabla de artículos: familia, grupo, código, nombre, cantidad, observación. Si es Entrega EPP: tipo de entrega, empleado (nombre, apellido, DNI), fecha de recambio y estado de recambio (pendiente / debe recambiarse / recambiado). Las fotos del remito pueden ser varias (el remito puede tener más de una hoja). En el header, a la izquierda de “Volver”, está “Descargar Word”: genera un documento con todo el detalle (cabecera, datos de Entrega EPP si aplica, tabla de artículos y fotos del remito si se pudieron leer). Lo pueden usar Administrador, Vista y descarga y el Responsable de depósito que puede ver ese movimiento. Vista y descarga solo mira, descarga el Word y puede ver las fotos; no carga ni edita.
 Nuevo movimiento ( Rol Administrador y Rol Responsable de Deposito )
 Carga de nuevo movimiento
 Esta página tiene varios pasos, cada que completen un paso es que irán al siguiente y se podrán mover entre cada paso sin perder la información (con una barra arriba por cada paso completo así sabe cuánto le falta para cargar el movimiento ), apenas ingresa se le muestra el primer paso, no puede pasar al siguiente paso si no ha completado el que se encuentra, si volvió a un paso que ya está completo entonces sí podría seguir ya que ya está completo, y una vez termine todos los pasos, tendrá una última vista de revisar y cargar donde vera todo lo que cargo en cada paso para editar ahí mismo en caso que se haya equivocado, así cuando revise que este todo bien cargue el movimiento:
@@ -143,7 +143,7 @@ Paso 2 : carga de datos del tipo de movimiento seleccionado (buscando en sus res
 Formulario Entrada: depósito destino ( select ), proveedor ( select )
 Formulario Salida: deposito origen (select sin la opción del depósito destino si ya lo selecciono), deposito destino (select, sin la opción del depósito origen seleccionado), ¿es devolución? (select Si o No para true ir false) ,si es devolución aparecerá un select para que seleccione el proveedor.
 Formulario de Transferencia: depósito de origen y destino como en el formulario de salida, motivo (opcional / textarea ).
-Formulario de Entrega EPP: depósito origen, depósito destino (distinto), tipo de entrega (Ingreso | Recambio por rotura | Recambio por talle), observación (opcional), empleado.PD: Empleado en Entrega EPP. Búsqueda por nombre. En la lista se ven nombre, apellido, DNI y mail para confirmar. Si no está, se da de alta ahí mismo con esos cuatro datos, sin Auth. Un movimiento es para un solo empleado; ese empleado puede recibir varios artículos EPP. Si hay que entregar a otra persona, se carga otro movimiento.
+Formulario de Entrega EPP: depósito origen, depósito destino (distinto), tipo de entrega (Ingreso | Recambio por rotura | Recambio por talle), observación (opcional), empleado.PD: Empleado en Entrega EPP. Búsqueda por nombre, apellido o DNI. En la lista se ven nombre, apellido y DNI para confirmar. Si no está, se da de alta ahí mismo con esos tres datos, sin Auth ni mail. Un movimiento es para un solo empleado; ese empleado puede recibir varios artículos EPP. Si hay que entregar a otra persona, se carga otro movimiento.
 Paso 3: Selección de Artículos para mover: en este paso tendrán un input de búsqueda por código/nombre del articulo para que puedan filtrar la tabla donde estarán con las siguientes columnas:
 Check: esta es la columna donde seleccionaran el articulo
 Código: vista
@@ -164,10 +164,10 @@ Inventario EPP (inventario_epp_personal). Es la cantidad que está usando el emp
 •Nueva entrega al mismo empleado (recambio): primero se resta, de cada artículo, la cantidad de su última entrega. Después se suman las cantidades de la entrega actual.
 •Si en el recambio un artículo de la última entrega no viene en la actual, esa fila se borra del inventario EPP (se reemplazó; ya no lo tiene).
 •Así el inventario EPP siempre muestra lo que el empleado tiene ahora, no el histórico mezclado.
-Fecha de recambio: fecha del movimiento + 30 días, automática. El recambio queda hecho cuando se carga otra Entrega EPP al mismo empleado. Eso actualiza cantidades (regla de arriba), corre la fecha de recambio otros 30 días y apaga la alerta.
+Fecha de recambio: fecha del movimiento + 6 meses, automática. El recambio queda hecho cuando se carga otra Entrega EPP al mismo empleado. Eso actualiza cantidades (regla de arriba), corre la fecha de recambio otros 6 meses y apaga la alerta.
 Historial de Entregas
 Administrador y Vista y descarga ven todos los empleados. El Responsable de depósito ve los empleados/entregas de sus depósitos. Esta página es propia (ruta /entregas), no un extra de Movimientos. Entra por el sidebar (Admin y Vista) y, para el Responsable, por su nav junto a Artículos, Depósitos y Movimientos.
-Tabla de empleados: nombre, apellido, DNI, mail. Cada fila es un acordeón. Al abrirla se ve una línea de tiempo con todas las Entregas EPP de ese empleado (fecha, tipo de entrega, depósitos, remito, responsable que entregó, fecha de recambio / alerta) y, en cada entrega, los artículos y cantidades.
+Tabla de empleados: nombre, apellido, DNI. Cada fila es un acordeón. Al abrirla se ve una línea de tiempo con todas las Entregas EPP de ese empleado (fecha, tipo de entrega, depósitos, remito, responsable que entregó, fecha de recambio / alerta) y, en cada entrega, los artículos y cantidades.
 Notificaciones de la Plataforma (Barra de Navegación / Navbar): Los usuarios con acceso visualizarán un ícono de campana en la barra de navegación superior (Navbar). Este módulo registrará y notificará los eventos del sistema mediante Triggers automatizados desde la base de datos.
 Notificaciones de creación ( Rol Administrador )
 Aquí se notificara cada que se cree algún dato nuevo, que no haya existido antes. indicando la feche, hora, responsable, tabla y valor que se cree en las siguientes tablas:
@@ -201,8 +201,8 @@ sí es tipo entrada solo el depósito y si es de salida o trasferencia, los dep�
 sí tiene motivo o proveedor también mostrar
 cantidad total
 si es Entrega EPP, también el empleado.
-Notificacion de Alerta de recambio EPP (Administrador, responsable que cargó esa entrega y, en mail, el empleado).
-Cuando se cumple fecha_recambio y todavía no hay otra Entrega EPP a ese empleado, se genera la notificación Alerta_Recambio_EPP en la campana y se envía un mail al empleado y al responsable que hizo el movimiento, indicando que ya es hora de recambiar esos artículos en el depósito destino. La alerta también se ve en el inventario EPP, en la fila del movimiento y en el historial del artículo. El chequeo corre al entrar un usuario logueado (rpc_procesar_alertas_recambio): no hay un servidor Node 24/7. Es idempotente (no duplica la misma alerta empleado + depósito + fecha). Si nadie abre la app, las alertas y los mails esperan al primer ingreso.
+Notificacion de Alerta de recambio EPP (campana: Administrador, Vista y descarga y el usuario que cargó esa entrega; mail: solo ese usuario).
+Cuando se cumple fecha_recambio y todavía no hay otra Entrega EPP a ese empleado, se genera la notificación Alerta_Recambio_EPP en la campana y se envía un mail solo al usuario que hizo esa entrega, indicando que ya es hora de recambiar esos artículos en el depósito destino. El empleado no recibe mail (no tiene email). La alerta también se ve en el inventario EPP, en la fila del movimiento y en el historial del artículo. El chequeo corre al entrar un usuario logueado (rpc_procesar_alertas_recambio): no hay un servidor Node 24/7. Es idempotente (no duplica la misma alerta empleado + depósito + fecha). Si nadie abre la app, las alertas y los mails esperan al primer ingreso.
 Historial de notificaciones (Rol Administrador y Vista y Descarga)
 Visualización de Todas las Notificaciones: en el navbar, Admin y Vista tienen un botón de tuerca que abre Administración de responsables e Historial de Notificaciones. El Responsable de depósito no ve esa tuerca. La tabla muestra todas las notificaciones con columnas: Acción, fecha/hora, responsable de acción, tabla, desc (valores anteriores y actuales, depósitos, etc.).
 Filtrado de Notificaciones
@@ -244,9 +244,8 @@ id (UUID, PK)
 nombre (Varchar)
 apellido (Varchar)
 dni (Varchar, Único)
-email (Varchar)
 created_at, updated_at
-No tiene Auth, ni rol, ni estado de login. No opera la plataforma. Se crea o se elige solo al cargar una Entrega EPP.
+No tiene Auth, ni mail, ni rol, ni estado de login. No opera la plataforma. Se crea o se elige solo al cargar una Entrega EPP.
 Deposito
 id (UUID/Int, PK)
 codigo (Varchar, Único)
@@ -326,7 +325,7 @@ fotos_remito (Array de texto — URLs en Storage; una o más fotos, el remito pu
 cant_total_articulos (Int)
 tipo_entrega_epp (enum, nullable — solo Entrega EPP)
 id_empleado (FK a Empleados, nullable — solo Entrega EPP)
-fecha_recambio (Date, nullable — fecha + 30 días, solo Entrega EPP)
+fecha_recambio (Date, nullable — fecha + 6 meses, solo Entrega EPP)
 Entrega EPP exige origen y destino distintos, tipo_entrega_epp, id_empleado, nro. de remito y al menos una foto de remito. tipo_entrega_epp, id_empleado y fecha_recambio van NULL en Entrada, Salida y Transferencia.
 Movimientos_Articulos (Detalle de Movimiento)
 id (UUID/Int, PK)
@@ -353,7 +352,7 @@ Mails (EmailJS)
 Correos transaccionales con las plantillas de Simetra. Los links de redirección usan siempre la URL de Vercel de la plataforma (https://gestion-de-stock-woad.vercel.app), nunca localhost.
 •Código de ingreso (registro).
 •Recuperar contraseña (enlace a Vercel).
-•Alerta de recambio EPP: al empleado (su mail) y al responsable que cargó esa Entrega EPP, cuando se cumplen los 30 días.
+•Alerta de recambio EPP: solo al usuario que cargó esa Entrega EPP, cuando se cumplen los 6 meses. El empleado no tiene mail.
 Stack Tecnológico y Arquitectura del Sistema
 Supabase (BaaS - Backend as a Service):
 Actuará como el núcleo del backend de la plataforma (basado en PostgreSQL). Se encargará de la persistencia de datos relacionales, la gestión de autenticación de usuarios (Auth) y el almacenamiento de archivos estáticos mediante Supabase Storage (para las imágenes de los remitos). Además, se hará uso intensivo de Funciones y Triggers automáticos a nivel de base de datos para asegurar la integridad de la información y disparar eventos en tiempo real (ej. registro de notificaciones y cálculo de inventario).

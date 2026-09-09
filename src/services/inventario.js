@@ -90,7 +90,7 @@ export async function listInventarioEpp({ idDeposito = "", search = "" } = {}) {
         .select(`
             id, cantidad, disponible, fecha_entrega, fecha_recambio,
             depositos:id_deposito ( id, codigo, nombre ),
-            empleados:id_empleado ( id, nombre, apellido, dni, email ),
+            empleados:id_empleado ( id, nombre, apellido, dni ),
             articulos:id_articulo (${ARTICULO_EMBED})
         `)
         .order("fecha_recambio", { ascending: true, nullsFirst: false });
@@ -128,7 +128,6 @@ export async function listInventarioEpp({ idDeposito = "", search = "" } = {}) {
             empleado_nombre: emp?.nombre ?? "",
             empleado_apellido: emp?.apellido ?? "",
             empleado_dni: emp?.dni ?? "",
-            empleado_email: emp?.email ?? "",
             ...art,
         };
         if (!term) return [mapped];

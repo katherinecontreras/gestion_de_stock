@@ -15,7 +15,7 @@ export function PerfilMenu({ open, onOpen, onClose, onAdministrarDepositos }) {
     const { perfil, loading } = usePerfilSesion();
     const puedeDepositos = Boolean(perfil?.esResponsableDeposito) && !perfil?.esAdministrador && !perfil?.esVistaDescarga;
     return (<div onMouseEnter={onOpen} onMouseLeave={onClose}>
-      <FloatingPanel open={open} onClose={onClose} labelledBy="perfil-menu-trigger" panelClassName="w-80" trigger={<button type="button" id="perfil-menu-trigger" aria-label="Perfil" aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-app-secondary text-white transition-colors duration-hover hover:opacity-90">
+      <FloatingPanel open={open} onClose={onClose} labelledBy="perfil-menu-trigger" panelClassName="w-[min(20rem,calc(100vw-1.5rem))]" trigger={<button type="button" id="perfil-menu-trigger" aria-label="Perfil" aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-app-secondary text-white transition-colors duration-hover hover:opacity-90">
             <User size={18} strokeWidth={1.6}/>
           </button>}>
         {loading && !perfil ? (<p className="px-4 py-8 text-center text-sm text-app-mutedtext">

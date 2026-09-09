@@ -12,7 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { TableAppearRow, TableGhost, TableShell } from "@/components/ui/table";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { useToast } from "@/app/layouts/ToastProvider";
-import { asignarArticulosGrupo, codigoGrupoCompleto, createGrupo, eliminarGrupo, explainGrupoError, getFamiliaDetalle, listArticulosAsignacion, listGrupoCodigos, listGruposResumen, prefijoCodigoGrupo, updateGrupo, } from "@/services/grupos";
+import { asignarArticulosGrupo, codigoGrupoCompleto, createGrupo, eliminarGrupo, explainGrupoError, findGrupoPorCodigo, getFamiliaDetalle, listArticulosAsignacion, listGrupoCodigos, listGruposResumen, prefijoCodigoGrupo, updateGrupo, } from "@/services/grupos";
+import { hintCodigoUnico, mensajeGrupoCodigoOcupado } from "@/utils/codigo-unico";
 import { formatCurrency, formatFamiliaGrupo } from "@/utils/format";
 import { SPA_PATHS } from "@/utils/routes";
 function SortButton({ label, active, dir, align = "left", onClick, }) {
@@ -155,8 +156,15 @@ export function FamiliaDetalleScreen() {
         event.preventDefault();
         if (!id || !createCode.trim() || !createName.trim())
             return;
-        if (createCodeOwner)
+        const owner = createCodeOwner ?? await findGrupoPorCodigo(id, createCodigoCompleto);
+        if (owner) {
+            setCreateError(mensajeGrupoCodigoOcupado({
+                ...owner,
+                familia_codigo: familiaCodigo,
+                familia_descripcion: familia?.descripcion ?? owner.familia_descripcion,
+            }, createCodigoCompleto));
             return;
+        }
         setSaving(true);
         setCreateError(null);
         try {
@@ -180,10 +188,13 @@ export function FamiliaDetalleScreen() {
             notify("Completá código y descripción.", "error");
             return;
         }
-        const owner = codigos.find((row) => row.id !== draft.id &&
-            row.codigo.toLowerCase() === draft.codigo.trim().toLowerCase());
+        const owner = await findGrupoPorCodigo(id, draft.codigo, draft.id);
         if (owner) {
-            notify(`El código “${draft.codigo.trim()}” pertenece al grupo “${owner.descripcion}”.`, "error");
+            notify(mensajeGrupoCodigoOcupado({
+                ...owner,
+                familia_codigo: familiaCodigo,
+                familia_descripcion: familia?.descripcion ?? owner.familia_descripcion,
+            }, draft.codigo), "error");
             return;
         }
         setSaving(true);
@@ -420,7 +431,11 @@ export function FamiliaDetalleScreen() {
           {createError ? <Alert>{createError}</Alert> : null}
           {createCodeOwner?.estado === "inactivo" ? (<div className="rounded-control border border-app-input bg-app-subtle px-3 py-3 text-sm text-app-secondarytext">
               <p>
-                Ya existe un grupo con el código “{createCodigoCompleto}” (inactivo: {createCodeOwner.descripcion}). Si querés usar ese código, reactivá ese grupo o eliminalo. Si no, cambiá el texto.
+                {mensajeGrupoCodigoOcupado({
+                    ...createCodeOwner,
+                    familia_codigo: familiaCodigo,
+                    familia_descripcion: familia?.descripcion,
+                }, createCodigoCompleto)} Reactivalo o eliminalo, o usá otro código.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button" disabled={saving} onClick={() => void handleReactivar(createCodeOwner)}>
@@ -431,7 +446,11 @@ export function FamiliaDetalleScreen() {
                 </Button>
               </div>
             </div>) : createCodeOwner ? (<Alert>
-              Ya existe un grupo con el código “{createCodigoCompleto}” ({createCodeOwner.descripcion}).
+              {mensajeGrupoCodigoOcupado({
+                    ...createCodeOwner,
+                    familia_codigo: familiaCodigo,
+                    familia_descripcion: familia?.descripcion,
+                }, createCodigoCompleto)}
             </Alert>) : null}
           <label className="flex w-full flex-col gap-1.5">
             <span className="text-sm font-medium text-app-secondarytext">Código</span>
@@ -449,7 +468,7 @@ export function FamiliaDetalleScreen() {
               />
             </div>
             <span className="text-xs text-app-mutedtext">
-              Queda: {createCode.trim() ? createCodigoCompleto : codigoPrefijo || "—"}
+              Queda: {createCode.trim() ? createCodigoCompleto : codigoPrefijo || "—"}. {hintCodigoUnico("único en esta familia")}
             </span>
           </label>
           <Input label="Descripción" value={createName} maxLength={255} onChange={(event) => setCreateName(event.target.value)} required/>

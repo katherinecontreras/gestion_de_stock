@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { KeyRound, Mail, Search } from "lucide-react";
 import { AuthCard, AuthDivider, AuthPrompt } from "@/components/layout/auth-card";
 import { Alert } from "@/components/ui/alert";
@@ -196,7 +197,16 @@ export default function RecuperarPage() {
                     required
                     disabled={encontrado}
                 />
+                <AnimatePresence initial={false}>
                 {encontrado ? (
+                    <motion.div
+                        key="email"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                        className="overflow-hidden"
+                    >
                     <Input
                         label="Email"
                         type="email"
@@ -211,7 +221,9 @@ export default function RecuperarPage() {
                             </span>
                         }
                     />
+                    </motion.div>
                 ) : null}
+                </AnimatePresence>
                 </div>
                 <Button type="submit" className="w-full" disabled={pending || !isConfigured}>
                     {pending ? (
@@ -225,15 +237,21 @@ export default function RecuperarPage() {
                         ? (encontrado ? "Enviando…" : "Buscando…")
                         : (encontrado ? "Enviar mail" : "Buscar usuario")}
                 </Button>
+                <AnimatePresence initial={false}>
                 {encontrado ? (
-                    <button
+                    <motion.button
+                        key="otro-dni"
                         type="button"
                         className="w-full text-center text-[13px] font-medium text-app-mutedtext underline hover:text-app-primary"
                         onClick={resetBusqueda}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
                     >
                         Buscar otro DNI
-                    </button>
+                    </motion.button>
                 ) : null}
+                </AnimatePresence>
                 <div className="space-y-3 pt-1">
                     <AuthDivider />
                     <AuthPrompt

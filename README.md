@@ -121,12 +121,12 @@ Un push a la rama de producción dispara el deploy automático.
 
 - Identificadores de negocio en `snake_case` (PostgreSQL).
 - Borrado lógico (`estado = inactivo`) en maestros con historial: proveedores, responsables, depósitos, artículos.
-- Contraseñas solo en **Supabase Auth**. `responsables.auth_user_id` queda vacío en el rol **Empleado** (tiene mail, no entra a la plataforma).
+- Contraseñas solo en **Supabase Auth**. El empleado no opera la plataforma: vive en `empleados` (nombre, apellido, DNI; sin mail ni Auth).
 - No se usan `registrado`, `invitado_en` ni `registrado_en`. Alcanzan `created_at` y `updated_at`.
 - El login usa DNI: se resuelve el email con `rpc_email_por_dni` y luego `signInWithPassword`. El Empleado no se ofrece en el registro.
 - Los movimientos se persisten con `rpc_crear_movimiento` (encabezado + detalle en la misma transacción).
 - **Entrega EPP:** un movimiento = un empleado, N artículos `is_epp`. Resta stock solo en el origen. El inventario EPP (`inventario_epp_personal`) guarda lo que usa cada empleado; en un recambio se resta la última entrega, se borran artículos que ya no van y se suman los nuevos.
-- `fecha_recambio` = fecha del movimiento + 30 días. Al vencer: notificación `Alerta_Recambio_EPP` y mail al empleado y al responsable que cargó la entrega.
+- `fecha_recambio` = fecha del movimiento + 6 meses. Al vencer: notificación `Alerta_Recambio_EPP` y mail solo al usuario que cargó esa entrega.
 - `fotos_remito` es un array: el remito puede tener varias hojas.
 
 ## Roles

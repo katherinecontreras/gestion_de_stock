@@ -15,7 +15,7 @@ const ADMIN_LINKS = [
     },
 ];
 export function AdminMenu({ open, onOpen, onClose }) {
-    return (<FloatingPanel open={open} onClose={onClose} labelledBy="admin-menu-trigger" panelClassName="w-72 p-1.5" trigger={<button type="button" id="admin-menu-trigger" aria-label="Administración" aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="inline-flex h-10 w-10 items-center justify-center rounded-full text-app-secondarytext transition-colors duration-hover hover:bg-app-subtle">
+    return (<FloatingPanel open={open} onClose={onClose} labelledBy="admin-menu-trigger" panelClassName="w-[min(18rem,calc(100vw-1.5rem))] p-1.5" trigger={<button type="button" id="admin-menu-trigger" aria-label="Administración" aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="inline-flex h-10 w-10 items-center justify-center rounded-full text-app-secondarytext transition-colors duration-hover hover:bg-app-subtle">
           <Settings size={24} strokeWidth={1.6}/>
         </button>}>
       {ADMIN_LINKS.map((item) => {

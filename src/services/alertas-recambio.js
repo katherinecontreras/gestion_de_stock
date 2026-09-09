@@ -33,17 +33,7 @@ export async function procesarAlertasRecambio() {
         const deposito = item.deposito || "depósito";
         const empleado = item.empleado_nombre || "el empleado";
         try {
-            if (item.empleado_email) {
-                await sendAlertaRecambioEpp({
-                    email: item.empleado_email,
-                    empleado,
-                    dni: item.dni || "",
-                    deposito,
-                    articulos,
-                    fechaRecambio: fecha,
-                });
-            }
-            if (item.responsable_email && item.responsable_email !== item.empleado_email) {
+            if (item.responsable_email) {
                 await sendAlertaRecambioEpp({
                     email: item.responsable_email,
                     empleado,

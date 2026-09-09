@@ -14,12 +14,12 @@ export function Layout({ children }) {
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-app-bg">
             <Navbar />
-            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row">
                 {hideSidebar ? null : (
                     <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
                 )}
-                <main className="min-h-0 flex-1 overflow-y-auto">
-                    <div className="mx-auto min-h-full max-w-office px-3 py-4 md:px-8 md:py-8">
+                <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+                    <div className="mx-auto min-h-full w-full max-w-office px-3 py-4 sm:px-5 md:px-8 md:py-8">
                         {children}
                     </div>
                 </main>

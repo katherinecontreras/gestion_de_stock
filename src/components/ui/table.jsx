@@ -1,13 +1,20 @@
 import { motion } from "motion/react";
 import { cn } from "@/utils/cn";
-export function TableShell({ toolbar, children, empty, className, }) {
-    return (<div className={cn("overflow-hidden rounded-table border border-app-border bg-app-surface shadow-table", className)}>
-      {toolbar ? (<div className="border-b border-app-border-subtle bg-app-muted p-3">
-          {toolbar}
-        </div>) : null}
-      {children ? (<div className="min-w-[40rem] overflow-x-auto">{children}</div>) : null}
-      {empty ? (<p className="px-4 py-8 text-center text-sm text-app-mutedtext">{empty}</p>) : null}
-    </div>);
+import { easeOut } from "@/utils/motion";
+
+export function TableShell({ toolbar, children, empty, className }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32, ease: easeOut }}
+            className={cn("max-w-full overflow-hidden rounded-table border border-app-border bg-app-surface shadow-table", className)}
+        >
+            {toolbar ? <div className="border-b border-app-border-subtle bg-app-muted p-3">{toolbar}</div> : null}
+            {children ? <div className="overflow-x-auto overscroll-x-contain">{children}</div> : null}
+            {empty ? <p className="px-4 py-8 text-center text-sm text-app-mutedtext">{empty}</p> : null}
+        </motion.div>
+    );
 }
 const GHOST_WIDTHS = ["4.5rem", "11rem", "5.5rem", "6.5rem", "7rem", "5rem"];
 export function TableGhost({ columns, rows = 8, minWidth = "40rem", }) {
@@ -31,11 +38,19 @@ export function TableGhost({ columns, rows = 8, minWidth = "40rem", }) {
     </table>);
 }
 export function TableAppearRow({ index, className, children, ...props }) {
-    return (<motion.tr initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{
-            duration: 0.28,
-            delay: Math.min(index, 18) * 0.045,
-            ease: [0.22, 1, 0.36, 1],
-        }} className={className} {...props}>
-      {children}
-    </motion.tr>);
+    return (
+        <motion.tr
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+                duration: 0.32,
+                delay: Math.min(index, 14) * 0.035,
+                ease: easeOut,
+            }}
+            className={className}
+            {...props}
+        >
+            {children}
+        </motion.tr>
+    );
 }

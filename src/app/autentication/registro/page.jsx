@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { Mail, Search, UserPlus } from "lucide-react";
 import { AuthCard, AuthDivider, AuthPrompt } from "@/components/layout/auth-card";
 import { Alert } from "@/components/ui/alert";
@@ -20,6 +21,8 @@ import {
     reenviarCodigoRegistro,
     vincularAuthRegistro,
 } from "@/services/registro";
+import { appPublicHref } from "@/lib/app-url";
+import { slideStep, springSoft, staggerContainer, staggerItem } from "@/utils/motion";
 import { APP_ROUTES } from "@/utils/routes";
 import { digitsOnly, isValidEmail, isValidPassword, passwordsMatch } from "@/utils/validators";
 
@@ -79,9 +82,15 @@ function CodeInputs({ value, onChange, disabled }) {
     }
 
     return (
-        <div className="mx-auto flex w-full max-w-md justify-center gap-1.5 sm:gap-3" onPaste={handlePaste}>
+        <motion.div
+            className="mx-auto flex w-full max-w-md justify-center gap-1.5 sm:gap-3"
+            onPaste={handlePaste}
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+        >
             {Array.from({ length: 6 }, (_, index) => (
-                <input
+                <motion.input
                     key={index}
                     ref={(node) => { refs.current[index] = node; }}
                     inputMode="numeric"
@@ -90,11 +99,14 @@ function CodeInputs({ value, onChange, disabled }) {
                     value={value[index] ?? ""}
                     onChange={(event) => handleChange(index, event.target.value)}
                     onKeyDown={(event) => handleKeyDown(index, event)}
+                    variants={staggerItem}
+                    whileFocus={{ scale: 1.06 }}
+                    transition={springSoft}
                     className="h-12 min-w-0 flex-1 rounded-control border border-app-input bg-app-surface text-center font-mono text-lg text-app-primary focus:border-app-focus focus:ring-1 focus:ring-app-focus"
                     aria-label={`Dígito ${index + 1}`}
                 />
             ))}
-        </div>
+        </motion.div>
     );
 }
 
@@ -191,10 +203,24 @@ export default function RegistroPage() {
         const { error: signError } = await supabase.auth.signUp({
             email: result.email,
             password: pass,
+            options: {
+                emailRedirectTo: appPublicHref(APP_ROUTES.login, { dni: result.dni }),
+            },
         });
-        if (signError && !/already/i.test(signError.message))
+        if (
+            signError
+            && !/already/i.test(signError.message)
+            && !/confirmation email|error sending confirmation/i.test(signError.message)
+        ) {
             throw signError;
-        await vincularAuthRegistro(result.token);
+        }
+        try {
+            await vincularAuthRegistro(result.token);
+        }
+        catch {
+            await supabase.auth.signOut();
+            await vincularAuthRegistro(result.token);
+        }
         try {
             await sendCodigoIngreso({
                 email: result.email,
@@ -355,17 +381,35 @@ export default function RegistroPage() {
         }
     }
 
-    if (step === "codigo") {
-        return (
-            <AuthCard
-                title="Código de ingreso"
-                description="Ingresá el código de 6 dígitos que te mandamos al mail. Después vas a entrar con DNI y contraseña."
-            >
-                <form className="space-y-4" onSubmit={handleConfirm}>
+    return (
+        <AuthCard
+            wide={step !== "codigo"}
+            title={step === "codigo" ? "Código de ingreso" : "Registrarme"}
+            description={
+                step === "codigo"
+                    ? "Ingresá el código de 6 dígitos que te mandamos al mail. Después vas a entrar con DNI y contraseña."
+                    : "Completá tus datos. Después vas a ingresar con DNI y contraseña. No se puede elegir Administrador."
+            }
+        >
+            <AnimatePresence mode="wait" initial={false}>
+            {step === "codigo" ? (
+                <motion.form
+                    key="codigo"
+                    className="space-y-4"
+                    onSubmit={handleConfirm}
+                    {...slideStep}
+                >
                     {error ? <Alert>{error}</Alert> : null}
                     <CodeInputs value={codigo} onChange={setCodigo} disabled={pending} />
+                    <AnimatePresence mode="wait" initial={false}>
                     {mailEdit ? (
-                        <div className="space-y-2">
+                        <motion.div
+                            key="mail-edit"
+                            className="space-y-2"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                        >
                             <Input
                                 label="Email"
                                 type="email"
@@ -376,9 +420,15 @@ export default function RegistroPage() {
                                 {pending ? <Spinner className="h-4 w-4 text-white" /> : null}
                                 Guardar email y reenviar
                             </Button>
-                        </div>
+                        </motion.div>
                     ) : (
-                        <p className="text-center text-[13px] text-app-mutedtext">
+                        <motion.p
+                            key="mail-info"
+                            className="text-center text-[13px] text-app-mutedtext"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                        >
                             Lo enviamos a <span className="font-medium text-app-primary">{email}</span>
                             {" · "}
                             <button
@@ -391,8 +441,9 @@ export default function RegistroPage() {
                             >
                                 Cambiar mail
                             </button>
-                        </p>
+                        </motion.p>
                     )}
+                    </AnimatePresence>
                     <Button type="submit" className="w-full" disabled={pending || digitsOnly(codigo).length !== 6}>
                         {pending ? <Spinner className="h-4 w-4 text-white" /> : null}
                         Confirmar código
@@ -409,18 +460,14 @@ export default function RegistroPage() {
                             action="Iniciá sesión"
                         />
                     </div>
-                </form>
-            </AuthCard>
-        );
-    }
-
-    return (
-        <AuthCard
-            wide
-            title="Registrarme"
-            description="Completá tus datos. Después vas a ingresar con DNI y contraseña. No se puede elegir Administrador."
-        >
-            <form className="space-y-3" onSubmit={handleSubmit}>
+                </motion.form>
+            ) : (
+            <motion.form
+                key="form"
+                className="space-y-3"
+                onSubmit={handleSubmit}
+                {...slideStep}
+            >
                 {!isConfigured ? (
                     <Alert>Faltan las claves de Supabase en el archivo .env.</Alert>
                 ) : null}
@@ -459,8 +506,16 @@ export default function RegistroPage() {
                         required
                     />
                 </div>
+                <AnimatePresence mode="wait" initial={false}>
                 {rol === "Responsable_Deposito" ? (
-                    <div className="space-y-2">
+                    <motion.div
+                        key="depositos"
+                        className="space-y-2 overflow-hidden"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                    >
                         <p className="text-sm font-medium text-app-secondarytext">Depósitos a cargo (mínimo uno)</p>
                         <label className="relative block">
                             <Search size={16} strokeWidth={1.7} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-faint" />
@@ -472,6 +527,7 @@ export default function RegistroPage() {
                             />
                         </label>
                         <div className="max-h-56 overflow-auto rounded-xl border border-app-border-subtle md:max-h-80">
+                            <div className="min-w-0 overflow-x-auto">
                             {depositosLoading ? (
                                 <p className="flex items-center justify-center gap-2 px-4 py-6 text-center text-sm text-app-mutedtext">
                                     <Spinner className="h-4 w-4" />
@@ -513,13 +569,21 @@ export default function RegistroPage() {
                                     </tbody>
                                 </table>
                             )}
+                            </div>
                         </div>
-                    </div>
+                    </motion.div>
                 ) : (
-                    <p className="text-[13px] text-app-mutedtext">
+                    <motion.p
+                        key="vista"
+                        className="text-[13px] text-app-mutedtext"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                    >
                         Vista y descarga ve toda la información y puede descargar. No se le asignan depósitos.
-                    </p>
+                    </motion.p>
                 )}
+                </AnimatePresence>
                 <Button type="submit" className="w-full" disabled={pending || !isConfigured}>
                     {pending ? <Spinner className="h-4 w-4 text-white" /> : <UserPlus size={16} strokeWidth={1.6} />}
                     {pending ? "Guardando…" : "Guardar y enviar código"}
@@ -532,7 +596,9 @@ export default function RegistroPage() {
                         action="Iniciá sesión"
                     />
                 </div>
-            </form>
+            </motion.form>
+            )}
+            </AnimatePresence>
         </AuthCard>
     );
 }

@@ -33,6 +33,7 @@ import { listDepositosPropios } from "@/services/depositos";
 import { downloadArticulosExcel, parseArticulosExcel } from "@/utils/excel-articulos";
 import { cn } from "@/utils/cn";
 import { formatCurrency, formatFamiliaGrupo } from "@/utils/format";
+import { hintCodigoUnico, mensajeArticuloCodigoOcupado } from "@/utils/codigo-unico";
 import { SPA_PATHS } from "@/utils/routes";
 
 function SortButton({ label, active, dir, align = "left", onClick }) {
@@ -260,7 +261,7 @@ export function ArticulosScreen() {
         }
         const owner = createCodeOwner ?? await findArticuloPorCodigo(create.codigo);
         if (owner) {
-            setCreateError(`El código “${create.codigo.trim()}” pertenece al artículo “${owner.nombre}”.`);
+            setCreateError(mensajeArticuloCodigoOcupado(owner, create.codigo));
             return;
         }
         setSaving(true);
@@ -288,7 +289,7 @@ export function ArticulosScreen() {
         }
         const owner = await findArticuloPorCodigo(draft.codigo, draft.id);
         if (owner) {
-            notify(`El código “${draft.codigo.trim()}” pertenece al artículo “${owner.nombre}”.`, "error");
+            notify(mensajeArticuloCodigoOcupado(owner, draft.codigo), "error");
             return;
         }
         if (draft.reemplazarCosto && (draft.nuevoCosto === "" || Number(draft.nuevoCosto) < 0)) {
@@ -803,7 +804,7 @@ export function ArticulosScreen() {
                 <form id="create-articulo" className="space-y-3" onSubmit={handleCreate}>
                     {createError ? <Alert>{createError}</Alert> : null}
                     {createCodeOwner ? (
-                        <Alert>Ya existe un artículo con el código “{create.codigo.trim()}” ({createCodeOwner.nombre}).</Alert>
+                        <Alert>{mensajeArticuloCodigoOcupado(createCodeOwner, create.codigo)}</Alert>
                     ) : null}
                     <Input
                         label="Código"
@@ -811,7 +812,7 @@ export function ArticulosScreen() {
                         maxLength={40}
                         onChange={(event) => setCreate({ ...create, codigo: event.target.value })}
                         required
-                        hint={<span className="text-xs text-app-mutedtext">Sugerido: {suggestedCode}</span>}
+                        hint={<span className="text-xs text-app-mutedtext">Sugerido: {suggestedCode}. {hintCodigoUnico()}</span>}
                     />
                     <Input label="Nombre" value={create.nombre} maxLength={255} onChange={(event) => setCreate({ ...create, nombre: event.target.value })} required />
                     <Input label="Unidad" value={create.unidad_de_medida} maxLength={40} onChange={(event) => setCreate({ ...create, unidad_de_medida: event.target.value })} required />

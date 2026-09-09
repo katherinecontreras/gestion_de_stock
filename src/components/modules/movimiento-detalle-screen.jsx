@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge, InternalCode } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { explainMovimientoError, getMovimiento, signedUrlsRemito } from "@/servi
 import { formatDate, formatDateTime, formatFamiliaGrupo } from "@/utils/format";
 import { formatDepositosMovimiento, labelTipoEntregaEpp, labelTipoMovimiento, recambioEstado, toneTipoMovimiento } from "@/utils/movimientos";
 import { SPA_PATHS } from "@/utils/routes";
+import { downloadMovimientoWord } from "@/utils/word-movimiento";
 
 export function MovimientoDetalleScreen() {
     const { id } = useParams();
@@ -21,6 +22,7 @@ export function MovimientoDetalleScreen() {
     const [mov, setMov] = useState(null);
     const [fotos, setFotos] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
@@ -55,6 +57,19 @@ export function MovimientoDetalleScreen() {
         return () => { cancelled = true; };
     }, [id, notify]);
 
+    async function handleDownload() {
+        if (!mov) return;
+        setDownloading(true);
+        try {
+            await downloadMovimientoWord(mov, fotos);
+            notify("Word descargado.", "success");
+        } catch (err) {
+            notify(err.message || "No se pudo descargar el Word.", "error");
+        } finally {
+            setDownloading(false);
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex min-h-[40vh] items-center justify-center">
@@ -71,10 +86,20 @@ export function MovimientoDetalleScreen() {
                 title={mov ? `Movimiento ${labelTipoMovimiento(mov.tipo)}` : "Detalle de movimiento"}
                 description={mov ? `Remito ${mov.nro_remito}` : "Cabecera y artículos del movimiento."}
                 actions={
-                    <Button variant="secondary" onClick={() => navigate(SPA_PATHS.movimientos)}>
-                        <ArrowLeft size={18} strokeWidth={1.6} />
-                        Volver
-                    </Button>
+                    <>
+                        <Button
+                            variant="secondary"
+                            onClick={() => void handleDownload()}
+                            disabled={!mov || downloading}
+                        >
+                            {downloading ? <Spinner className="h-4 w-4" /> : <Download size={18} strokeWidth={1.6} />}
+                            {downloading ? "Descargando…" : "Descargar Word"}
+                        </Button>
+                        <Button variant="secondary" onClick={() => navigate(SPA_PATHS.movimientos)}>
+                            <ArrowLeft size={18} strokeWidth={1.6} />
+                            Volver
+                        </Button>
+                    </>
                 }
             />
 
@@ -100,7 +125,7 @@ export function MovimientoDetalleScreen() {
                                     <Dato label="Tipo de entrega">{labelTipoEntregaEpp(mov.tipo_entrega_epp) ?? "—"}</Dato>
                                     <Dato label="Empleado">
                                         {mov.empleado
-                                            ? `${mov.empleado.etiqueta} · DNI ${mov.empleado.dni} · ${mov.empleado.email}`
+                                            ? `${mov.empleado.etiqueta} · DNI ${mov.empleado.dni}`
                                             : "—"}
                                     </Dato>
                                     <Dato label="Fecha de recambio">{formatDate(mov.fecha_recambio)}</Dato>

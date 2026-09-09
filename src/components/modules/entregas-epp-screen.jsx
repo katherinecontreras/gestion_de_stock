@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, Search } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,6 @@ import { explainMovimientoError, groupEntregasPorEmpleado, listEntregasEpp } fro
 import { formatDate, formatDateTime } from "@/utils/format";
 import { formatDepositosMovimiento, labelTipoEntregaEpp, recambioEstado } from "@/utils/movimientos";
 import { SPA_PATHS } from "@/utils/routes";
-import { cn } from "@/utils/cn";
 
 function toneRecambio(estado) {
     if (estado === "Debe recambiarse") return "warning";
@@ -61,7 +61,7 @@ export function EntregasEppScreen() {
         if (!term) return rows;
         return rows.filter((row) => {
             const emp = row.empleado;
-            return `${emp.nombre} ${emp.apellido} ${emp.dni} ${emp.email ?? ""}`.toLowerCase().includes(term);
+            return `${emp.nombre} ${emp.apellido} ${emp.dni}`.toLowerCase().includes(term);
         });
     }, [rows, search]);
 
@@ -98,7 +98,7 @@ export function EntregasEppScreen() {
                         <input
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Buscar por nombre, apellido, DNI o mail"
+                            placeholder="Buscar por nombre, apellido o DNI"
                             className="w-full rounded-control border border-app-input bg-app-surface py-2 pl-9 pr-3 text-sm text-app-primary placeholder:text-app-faint focus:border-app-focus focus:ring-1 focus:ring-app-focus"
                         />
                     </label>
@@ -115,17 +115,15 @@ export function EntregasEppScreen() {
                     <TableGhost columns={[
                         { label: "Empleado" },
                         { label: "DNI" },
-                        { label: "Mail" },
                         { label: "Entregas EPP" },
                     ]} />
                 ) : filtered.length > 0 ? (
-                    <table className="w-full min-w-[48rem] text-left text-sm">
+                    <table className="w-full text-left text-sm">
                         <thead className="bg-app-muted text-app-mutedtext">
                             <tr>
-                                <th className="px-4 py-3 font-semibold">Empleado</th>
-                                <th className="px-4 py-3 font-semibold">DNI</th>
-                                <th className="px-4 py-3 font-semibold">Mail</th>
-                                <th className="px-4 py-3 text-right font-semibold">Entregas EPP</th>
+                                <th className="px-3 py-3 font-semibold sm:px-4">Empleado</th>
+                                <th className="hidden px-4 py-3 font-semibold sm:table-cell">DNI</th>
+                                <th className="px-3 py-3 text-right font-semibold sm:px-4">Entregas EPP</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -133,29 +131,40 @@ export function EntregasEppScreen() {
                                 const open = openId === row.empleado.id;
                                 return (
                                     <TableAppearRow key={row.empleado.id} index={index} className="border-t border-app-border-subtle align-top">
-                                        <td colSpan={4} className="px-0 py-0">
+                                        <td colSpan={3} className="px-0 py-0">
                                             <button
                                                 type="button"
                                                 aria-expanded={open}
                                                 onClick={() => setOpenId(open ? null : row.empleado.id)}
-                                                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-app-subtle"
+                                                className="flex w-full items-center gap-2 px-3 py-3 text-left hover:bg-app-subtle sm:gap-3 sm:px-4"
                                             >
-                                                <ChevronDown
-                                                    size={18}
-                                                    strokeWidth={1.7}
-                                                    className={cn("shrink-0 text-app-faint transition-transform", open && "rotate-180")}
-                                                />
+                                                <motion.span
+                                                    animate={{ rotate: open ? 180 : 0 }}
+                                                    transition={{ type: "spring", stiffness: 380, damping: 26 }}
+                                                    className="shrink-0 text-app-faint"
+                                                >
+                                                    <ChevronDown size={18} strokeWidth={1.7} />
+                                                </motion.span>
                                                 <span className="min-w-0 flex-1 font-medium text-app-primary">
                                                     {row.empleado.apellido}, {row.empleado.nombre}
+                                                    <span className="mt-0.5 block font-mono text-xs font-normal text-app-secondarytext sm:hidden">
+                                                        DNI {row.empleado.dni}
+                                                    </span>
                                                 </span>
-                                                <span className="w-28 shrink-0 font-mono text-app-secondarytext">{row.empleado.dni}</span>
-                                                <span className="hidden min-w-0 flex-1 truncate text-app-secondarytext lg:block">{row.empleado.email || "—"}</span>
-                                                <span className="w-24 shrink-0 text-right tabular-nums text-app-secondarytext">
+                                                <span className="hidden w-28 shrink-0 font-mono text-app-secondarytext sm:block">{row.empleado.dni}</span>
+                                                <span className="w-16 shrink-0 text-right tabular-nums text-app-secondarytext sm:w-24">
                                                     {row.entregas.length}
                                                 </span>
                                             </button>
+                                            <AnimatePresence initial={false}>
                                             {open ? (
-                                                <ol className="relative space-y-4 border-t border-app-border-subtle bg-app-muted/40 px-4 py-4 pl-12">
+                                                <motion.ol
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: "auto" }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                                                    className="relative space-y-4 overflow-hidden border-t border-app-border-subtle bg-app-muted/40 px-3 py-4 pl-8 sm:px-4 sm:pl-12"
+                                                >
                                                     {row.entregas.map((mov) => {
                                                         const alerta = recambioEstado(mov.fecha_recambio, mov.recambiado);
                                                         return (
@@ -197,8 +206,9 @@ export function EntregasEppScreen() {
                                                             </li>
                                                         );
                                                     })}
-                                                </ol>
+                                                </motion.ol>
                                             ) : null}
+                                            </AnimatePresence>
                                         </td>
                                     </TableAppearRow>
                                 );

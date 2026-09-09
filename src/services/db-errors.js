@@ -6,7 +6,10 @@ export function errorText(error) {
 
 export function explainMissingDbFunction(message, fallback) {
   const text = message ?? "";
-  if (/PGRST205|schema cache|Could not find the table/i.test(text)) {
+  if (/PGRST202|Could not find the function/i.test(text)) {
+    return "Falta una función en la base. Pegá en el SQL Editor el ajuste que te pasé en el chat.";
+  }
+  if (/PGRST205|Could not find the table/i.test(text)) {
     return "La API no ve las tablas (faltan GRANT). Pegá en el SQL Editor el ajuste que te pasé en el chat.";
   }
   if (/fn_etiqueta_maestro/i.test(text)) {
@@ -14,6 +17,9 @@ export function explainMissingDbFunction(message, fallback) {
   }
   if (/does not exist/i.test(text) || /42883/.test(text)) {
     return "Falta una función en la base. Pegá en el SQL Editor el ajuste que te pasé en el chat.";
+  }
+  if (/schema cache/i.test(text)) {
+    return "La API no ve una tabla o función. Pegá el SQL del chat y recargá.";
   }
   return fallback;
 }

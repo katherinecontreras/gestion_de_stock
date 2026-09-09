@@ -17,7 +17,7 @@ export function Campana({ open, onOpen, onClose }) {
         wasOpen.current = false;
         void markAllRead();
     }, [open, markAllRead]);
-    return (<FloatingPanel open={open} onClose={onClose} labelledBy="campana-trigger" panelClassName="w-[22rem]" trigger={<button type="button" id="campana-trigger" aria-label={unreadCount > 0
+    return (<FloatingPanel open={open} onClose={onClose} labelledBy="campana-trigger" panelClassName="w-[min(22rem,calc(100vw-1.5rem))]" trigger={<button type="button" id="campana-trigger" aria-label={unreadCount > 0
                 ? `Notificaciones, ${unreadCount} sin leer`
                 : "Notificaciones"} aria-expanded={open} aria-haspopup="menu" onClick={() => (open ? onClose() : onOpen())} className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-app-secondarytext transition-colors duration-hover hover:bg-app-subtle">
           <Bell size={24} strokeWidth={1.6}/>

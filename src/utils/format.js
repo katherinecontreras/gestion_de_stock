@@ -20,10 +20,26 @@ export function formatDateTime(value) {
 export function formatDate(value) {
     if (!value)
         return "—";
-    const date = value instanceof Date ? value : new Date(`${value}T00:00:00`);
+    const date = value instanceof Date
+        ? value
+        : /T|\d:\d/.test(String(value))
+            ? new Date(value)
+            : new Date(`${value}T00:00:00`);
     if (Number.isNaN(date.getTime()))
         return "—";
     return DATE_ONLY_FORMATTER.format(date);
+}
+const TIME_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+});
+export function formatTime(value) {
+    if (!value)
+        return "—";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return "—";
+    return TIME_FORMATTER.format(date);
 }
 export function formatCurrency(value) {
     if (value === null || value === undefined)
