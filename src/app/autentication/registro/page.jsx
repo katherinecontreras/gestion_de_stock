@@ -174,16 +174,16 @@ export default function RegistroPage() {
         const term = depSearch.trim().toLowerCase();
         const list = term
             ? depositos.filter((row) => selected.has(row.id)
-                || row.codigo.toLowerCase().includes(term)
-                || row.nombre.toLowerCase().includes(term)
-                || row.ubicacion.toLowerCase().includes(term))
+                || String(row.codigo ?? "").toLowerCase().includes(term)
+                || String(row.nombre ?? "").toLowerCase().includes(term)
+                || String(row.ubicacion ?? "").toLowerCase().includes(term))
             : depositos;
         return [...list].sort((a, b) => {
             const aSel = selected.has(a.id) ? 0 : 1;
             const bSel = selected.has(b.id) ? 0 : 1;
             if (aSel !== bSel)
                 return aSel - bSel;
-            return a.codigo.localeCompare(b.codigo, "es", { numeric: true });
+            return String(a.codigo ?? "").localeCompare(String(b.codigo ?? ""), "es", { numeric: true });
         });
     }, [depositos, depSearch, selected]);
 
