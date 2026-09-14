@@ -1,3 +1,4 @@
+export { DashboardScreen } from "@/components/modules/dashboard-screen";
 export { ArticulosScreen } from "@/components/modules/articulos-screen";
 export { ArticuloHistorialScreen } from "@/components/modules/articulo-historial-screen";
 export { FamiliasScreen } from "@/components/modules/familias-screen";

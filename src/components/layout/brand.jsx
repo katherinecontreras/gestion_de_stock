@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
 
 export function Brand({
@@ -5,15 +6,17 @@ export function Brand({
   stacked = false,
   title = "Gestión de Stock",
   className,
+  to,
 }) {
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 items-center gap-2.5",
-        stacked && "flex-col justify-center gap-1.5 text-center",
-        className,
-      )}
-    >
+  const classes = cn(
+    "flex min-w-0 items-center gap-2.5",
+    stacked && "flex-col justify-center gap-1.5 text-center",
+    to && "rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-app-secondary/40",
+    className,
+  );
+
+  const content = (
+    <>
       <img
         src="/logo.png"
         alt="Simetra"
@@ -34,6 +37,16 @@ export function Brand({
           {title}
         </span>
       )}
-    </div>
+    </>
   );
+
+  if (to) {
+    return (
+      <Link to={to} aria-label={`${title} — ir al dashboard`} className={classes}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={classes}>{content}</div>;
 }

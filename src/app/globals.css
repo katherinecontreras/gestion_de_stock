@@ -99,3 +99,12 @@ textarea:focus {
   background-size: 200% 100%;
   animation: table-ghost 1.35s ease-in-out infinite;
 }
+
+.recharts-wrapper,
+.recharts-surface {
+  overflow: visible !important;
+}
+
+.recharts-tooltip-wrapper {
+  z-index: 50 !important;
+}

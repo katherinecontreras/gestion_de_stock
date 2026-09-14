@@ -1,6 +1,7 @@
-import { ArrowLeftRight, HardHat, Layers, Package, Truck, Warehouse } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, HardHat, Layers, Package, Truck, Warehouse } from "lucide-react";
 import { SPA_PATHS } from "@/utils/routes";
 export const NAV_ITEMS = [
+    { href: SPA_PATHS.dashboard, label: "Dashboard", icon: LayoutDashboard },
     { href: SPA_PATHS.articulos, label: "Artículos", icon: Package },
     { href: SPA_PATHS.familias, label: "Familias", icon: Layers },
     { href: SPA_PATHS.proveedores, label: "Proveedores", icon: Truck },
@@ -9,8 +10,17 @@ export const NAV_ITEMS = [
     { href: SPA_PATHS.entregas, label: "Entregas EPP", icon: HardHat },
 ];
 export const RESPONSABLE_NAV_ITEMS = NAV_ITEMS.filter((item) => (
-    item.href === SPA_PATHS.articulos
+    item.href === SPA_PATHS.dashboard
+    || item.href === SPA_PATHS.articulos
     || item.href === SPA_PATHS.depositos
     || item.href === SPA_PATHS.movimientos
     || item.href === SPA_PATHS.entregas
 ));
+
+export function navItemsForPerfil(perfil) {
+    if (!perfil) return [];
+    if (perfil.esResponsableDeposito && !perfil.esAdministrador && !perfil.esVistaDescarga) {
+        return RESPONSABLE_NAV_ITEMS;
+    }
+    return NAV_ITEMS;
+}

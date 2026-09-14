@@ -55,6 +55,9 @@ export function usePerfilSesion() {
             }
             const rolEmbed = data.roles;
             const tipo = Array.isArray(rolEmbed) ? rolEmbed[0]?.tipo : rolEmbed?.tipo;
+            const esAdministrador = tipo === "Administrador";
+            const esVistaDescarga = tipo === "Vista_Descarga" || tipo === "Vista_Consulta";
+            const esResponsableDeposito = tipo === "Responsable_Deposito";
             setPerfil({
                 id: data.id,
                 nombre: data.nombre,
@@ -65,9 +68,10 @@ export function usePerfilSesion() {
                 email: data.email,
                 rol: labelRol(tipo),
                 estado: data.estado === "activo" ? "Activo" : "Inactivo",
-                esAdministrador: tipo === "Administrador",
-                esVistaDescarga: tipo === "Vista_Descarga" || tipo === "Vista_Consulta",
-                esResponsableDeposito: tipo === "Responsable_Deposito",
+                esAdministrador,
+                esVistaDescarga,
+                esResponsableDeposito,
+                veTodaLaPlataforma: esAdministrador || esVistaDescarga,
             });
             setLoading(false);
         }

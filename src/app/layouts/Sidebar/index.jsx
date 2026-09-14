@@ -1,9 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
-import { NAV_ITEMS } from "../nav-items";
+import { navItemsForPerfil } from "../nav-items";
 
 export function Sidebar({ collapsed, onToggle }) {
     const { pathname } = useLocation();
@@ -11,6 +10,7 @@ export function Sidebar({ collapsed, onToggle }) {
     const iniciales = perfil?.iniciales ?? "—";
     const rol = perfil?.rol ?? (loading ? "…" : "Sin rol");
     const nombre = perfil?.nombreCompleto ?? (loading ? "Cargando…" : "Usuario");
+    const items = navItemsForPerfil(perfil);
     return (
         <aside
             className={cn(
@@ -34,7 +34,7 @@ export function Sidebar({ collapsed, onToggle }) {
                     collapsed ? "lg:overflow-visible" : "lg:overflow-y-auto",
                 )}
             >
-                {NAV_ITEMS.map((item) => {
+                {items.map((item) => {
                     const Icon = item.icon;
                     const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                     return (
@@ -48,16 +48,9 @@ export function Sidebar({ collapsed, onToggle }) {
                                 "lg:min-w-0 lg:w-full lg:flex-row lg:justify-start lg:gap-3.5 lg:px-3.5 lg:py-3.5 lg:text-[15px]",
                                 collapsed && "lg:justify-center lg:px-2 lg:py-3.5",
                                 !active && "hover:bg-app-hover",
-                                active && "text-app-primary",
+                                active && "bg-app-bg text-app-primary",
                             )}
                         >
-                            {active ? (
-                                <motion.span
-                                    layoutId="sidebar-active"
-                                    className="absolute inset-0 rounded-xl bg-app-bg"
-                                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                                />
-                            ) : null}
                             <Icon size={24} strokeWidth={1.7} className="relative z-10 shrink-0" />
                             <span className={cn("relative z-10 line-clamp-2", collapsed && "lg:hidden")}>
                                 {item.label}

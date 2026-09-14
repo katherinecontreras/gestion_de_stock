@@ -15,6 +15,7 @@ import RecuperarPage from "@/app/autentication/recuperar/page";
 import {
   ArticuloHistorialScreen,
   ArticulosScreen,
+  DashboardScreen,
   DepositosScreen,
   EntregasEppScreen,
   FamiliaDetalleScreen,
@@ -28,7 +29,6 @@ import {
 } from "@/app-spa/screens";
 import { useAuth } from "@/hooks/use-auth";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
-import { fadeUp, pageTransition } from "@/utils/motion";
 import { APP_ROUTES, SPA_PATHS, toAppEntry } from "@/utils/routes";
 
 const RR_FUTURE = {
@@ -78,7 +78,7 @@ function GuestOnly() {
   const { user, loading, registrado } = useAuth();
 
   if (loading) return <LoadingScreen />;
-  if (user && registrado) return <Navigate to={APP_ROUTES.articulos} replace />;
+  if (user && registrado) return <Navigate to={APP_ROUTES.dashboard} replace />;
   return <Outlet />;
 }
 
@@ -88,7 +88,7 @@ function RootRedirect() {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to={APP_ROUTES.login} replace />;
   if (!registrado) return <Navigate to={APP_ROUTES.registro} replace />;
-  return <Navigate to={APP_ROUTES.articulos} replace />;
+  return <Navigate to={APP_ROUTES.dashboard} replace />;
 }
 
 function LegacyPagesRedirect() {
@@ -97,7 +97,7 @@ function LegacyPagesRedirect() {
   const fromPath = pathname.startsWith("/pages/")
     ? pathname.slice("/pages".length)
     : "";
-  return <Navigate to={toAppEntry(fromHash || fromPath || "/articulos")} replace />;
+  return <Navigate to={toAppEntry(fromHash || fromPath || SPA_PATHS.dashboard)} replace />;
 }
 
 function AuthLayout() {
@@ -130,14 +130,15 @@ function RoleGate() {
   if (!perfil?.esResponsableDeposito) return <Outlet />;
 
   const allowed =
-    pathname === SPA_PATHS.articulos
+    pathname === SPA_PATHS.dashboard
+    || pathname === SPA_PATHS.articulos
     || pathname.startsWith(`${SPA_PATHS.articulos}/`)
     || pathname === SPA_PATHS.depositos
     || pathname === SPA_PATHS.movimientos
     || pathname.startsWith(`${SPA_PATHS.movimientos}/`)
     || pathname === SPA_PATHS.entregas;
 
-  if (!allowed) return <Navigate to={SPA_PATHS.articulos} replace />;
+  if (!allowed) return <Navigate to={SPA_PATHS.dashboard} replace />;
   return <Outlet />;
 }
 
@@ -149,8 +150,10 @@ function AppLayout() {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.pathname}
-          {...fadeUp}
-          transition={pageTransition}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
         >
           <Outlet />
         </motion.div>
@@ -162,7 +165,7 @@ function AppLayout() {
 export default function App() {
   return (
     <ToastProvider>
-      <MotionConfig reducedMotion="user">
+      <MotionConfig reducedMotion={import.meta.env.DEV ? "never" : "user"}>
         <BrowserRouter future={RR_FUTURE}>
           <Routes>
             <Route path="/" element={<RootRedirect />} />
@@ -183,6 +186,8 @@ export default function App() {
             <Route element={<RequireAuth />}>
               <Route element={<RoleGate />}>
               <Route element={<AppLayout />}>
+                <Route path="/inicio" element={<Navigate to={SPA_PATHS.dashboard} replace />} />
+                <Route path={SPA_PATHS.dashboard} element={<DashboardScreen />} />
                 <Route path={SPA_PATHS.articulos} element={<ArticulosScreen />} />
                 <Route path="/articulos/:id" element={<ArticuloHistorialScreen />} />
                 <Route path={SPA_PATHS.familias} element={<FamiliasScreen />} />

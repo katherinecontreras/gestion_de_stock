@@ -18,7 +18,7 @@ export function LoginForm({ configured = true }) {
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false);
   const [dni, setDni] = useState(digitsOnly(searchParams.get("dni")));
-  const redirectTo = searchParams.get("redirectTo") ?? APP_ROUTES.articulos;
+  const redirectTo = searchParams.get("redirectTo") ?? APP_ROUTES.dashboard;
   const nextPath = toAppEntry(redirectTo);
 
   async function signIn(form) {

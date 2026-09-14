@@ -1,6 +1,8 @@
 export const APP_SHELL = "/pages";
 
 export const SPA_PATHS = {
+  dashboard: "/dashboard",
+  inicio: "/dashboard",
   articulos: "/articulos",
   articuloHistorial: (id) => `/articulos/${id}`,
   familias: "/familias",
@@ -20,6 +22,8 @@ export const APP_ROUTES = {
   login: "/autentication/login",
   registro: "/autentication/registro",
   recuperar: "/autentication/recuperar",
+  dashboard: SPA_PATHS.dashboard,
+  inicio: SPA_PATHS.dashboard,
   articulos: SPA_PATHS.articulos,
   articuloHistorial: SPA_PATHS.articuloHistorial,
   familias: SPA_PATHS.familias,
@@ -35,7 +39,7 @@ export const APP_ROUTES = {
 };
 
 export function toAppEntry(path) {
-  if (!path) return APP_ROUTES.articulos;
+  if (!path) return APP_ROUTES.dashboard;
 
   let next = path;
   try {
@@ -45,11 +49,11 @@ export function toAppEntry(path) {
   }
 
   if (next.startsWith("/pages#")) next = next.slice("/pages#".length);
-  else if (next === "/pages") next = APP_ROUTES.articulos;
+  else if (next === "/pages") next = APP_ROUTES.dashboard;
   else if (next.startsWith("/pages/")) next = next.slice("/pages".length);
 
   if (next.startsWith("#")) next = next.slice(1);
-  if (!next || next === "/") return APP_ROUTES.articulos;
+  if (!next || next === "/" || next === "/inicio") return APP_ROUTES.dashboard;
   if (next.startsWith("/autentication")) return next;
   if (next.startsWith("/")) return next;
   return `/${next}`;

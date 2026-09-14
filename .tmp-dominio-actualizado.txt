@@ -4,7 +4,7 @@ esta plataforma es para tener un registro de todos los artículos que tiene la e
 Acá los usuario se guardan como responsables a los cuales se les podrá asignar los siguientes
 roles:
 Administrador: Carga, edición y baja de artículos, depósitos, proveedores, familias y movimientos, y ve el historial completo (artículo, notificaciones y entregas). En Administración de responsables solo visualiza, edita y elimina (no crea ni invita usuarios). Puede cambiar el rol, el estado y los depósitos asignados de cada responsable. El primer administrador se carga por fuera de la plataforma (seed). Nadie se registra con rol Administrador, tiene que ser asignado por otro Administrador. Navega con sidebar + tuerca (responsables e historial de notificaciones) + campana.
-Responsable de Deposito: Ve los artículos, depósitos y movimientos de los depósitos que tenga asignados (puede ser más de uno) y puede cargar movimientos en esos depósitos, incluida la Entrega EPP. También ve el historial de esos artículos y el historial de entregas de sus depósitos. Un depósito puede tener varios responsables y un responsable puede estar asignado a más de un depósito. Si su estado es inactivo, no puede ingresar a la plataforma. No tiene sidebar ni tuerca: en el navbar ve Artículos, Depósitos, Movimientos e Historial de Entregas. Desde el ícono de perfil puede administrar sus depósitos (mínimo uno).
+Responsable de Deposito: Ve los artículos, depósitos y movimientos de los depósitos que tenga asignados (puede ser más de uno) y puede cargar movimientos en esos depósitos, incluida la Entrega EPP. También ve el historial de esos artículos y el historial de entregas de sus depósitos. Un depósito puede tener varios responsables y un responsable puede estar asignado a más de un depósito. Si su estado es inactivo, no puede ingresar a la plataforma. Navega con sidebar (Dashboard, Artículos, Depósitos, Movimientos e Historial de Entregas) + campana, sin tuerca. El logo y el texto Gestión de Stock del navbar también llevan al Dashboard. Desde el ícono de perfil puede administrar sus depósitos (mínimo uno).
 Vista y descarga: Tiene acceso a toda la información de la plataforma igual que el Administrador (artículos, depósitos, proveedores, familias, movimientos, responsables, notificaciones e historial de entregas). Solo puede ver y descargar. Puede entrar al historial de un artículo y a “Ver grupos” de una familia, siempre en solo lectura. No puede crear, editar, eliminar, cargar (ni masiva ni individual), hacer movimientos ni ninguna otra acción de escritura. Navega con sidebar + tuerca + campana, igual que el Administrador.
 Empleado: Persona que recibe EPP. No es un rol de la tabla de responsables ni opera la plataforma: no inicia sesión, no tiene contraseña. Se guarda en la tabla empleados. Solo figura en entregas, inventario EPP e historial de entregas. No aparece como opción al registrarse. Solo se crea o se elige al cargar una Entrega EPP.
 Alta: en el movimiento se busca por nombre, apellido o DNI. En los resultados se ven nombre, apellido y DNI para confirmar si es la misma persona. Si está, se selecciona. Si no, se crea en empleados con nombre, apellido y DNI (sin Auth ni mail). El mail es solo de los usuarios que ingresan a la plataforma (tabla responsables).
@@ -12,6 +12,7 @@ Estas son todas las páginas que tendrá la plataforma:
 Login
 Registro
 Recuperar Contraseña
+Dashboard (tablero)
 Administración de responsables
 Artículos
 Historial de articulo
@@ -26,6 +27,8 @@ Historial de Entregas
 Notificaciones de la Plataforma
 Historial de Notificaciones
 Ahora los requerimientos funcionales para cada pagina
+Dashboard (Administrador, Vista y descarga y Responsable de depósito)
+Al ingresar a la plataforma, al pulsar Dashboard en el menú o al pulsar el logo / texto Gestión de Stock del navbar se ve el tablero del mes en curso. Administrador y Vista y descarga ven toda la plataforma. El Responsable de depósito solo ve sus depósitos. En la misma fila del título hay selects de mes, año y depósito. Mes y año solo listan períodos con movimientos (el mes se acota al año elegido y al depósito si hay uno). Por defecto se abre el mes en curso si tiene movimientos; si no, el más reciente. El depósito arranca en Todos los depósitos y solo lista depósitos con movimientos en ese mes/año. Arriba hay cuatro tarjetas: movimientos del mes, unidades en stock, EPP a recambiar y stock en cero. Abajo, en grilla, siete gráficos: movimientos por día y tipo, mix de tipos, stock por depósito, recambio EPP por depósito (pendiente / debe recambiarse / recambiado en el mes), stock por familia, artículos más movidos del mes y entregas EPP por tipo (ingreso, recambio por rotura, recambio por talle). Al pasar el mouse se ve el depósito o el origen → destino (no solo la cantidad). No se carga ni se edita nada desde esta página.
 Login (Todos)
 Ingreso a plataforma
 Primera página para ingresar a la plataforma: cargan DNI y contraseña. Si todavía no está registrado, presiona “Registrarme”. Si olvidó la contraseña, presiona “Recuperar contraseña” en esta misma pantalla (no se recupera desde Administración de responsables). Si el responsable está inactivo, no puede ingresar aunque la contraseña sea correcta.
@@ -166,7 +169,7 @@ Inventario EPP (inventario_epp_personal). Es la cantidad que está usando el emp
 •Así el inventario EPP siempre muestra lo que el empleado tiene ahora, no el histórico mezclado.
 Fecha de recambio: fecha del movimiento + 6 meses, automática. El recambio queda hecho cuando se carga otra Entrega EPP al mismo empleado. Eso actualiza cantidades (regla de arriba), corre la fecha de recambio otros 6 meses y apaga la alerta.
 Historial de Entregas
-Administrador y Vista y descarga ven todos los empleados. El Responsable de depósito ve los empleados/entregas de sus depósitos. Esta página es propia (ruta /entregas), no un extra de Movimientos. Entra por el sidebar (Admin y Vista) y, para el Responsable, por su nav junto a Artículos, Depósitos y Movimientos.
+Administrador y Vista y descarga ven todos los empleados. El Responsable de depósito ve los empleados/entregas de sus depósitos. Esta página es propia (ruta /entregas), no un extra de Movimientos. Entra por el sidebar (Admin, Vista y Responsable; el Responsable no ve Familias ni Proveedores).
 Tabla de empleados: nombre, apellido, DNI. Cada fila es un acordeón. Al abrirla se ve una línea de tiempo con todas las Entregas EPP de ese empleado (fecha, tipo de entrega, depósitos, remito, responsable que entregó, fecha de recambio / alerta) y, en cada entrega, los artículos y cantidades.
 Notificaciones de la Plataforma (Barra de Navegación / Navbar): Los usuarios con acceso visualizarán un ícono de campana en la barra de navegación superior (Navbar). Este módulo registrará y notificará los eventos del sistema mediante Triggers automatizados desde la base de datos.
 Notificaciones de creación ( Rol Administrador )
@@ -409,6 +412,6 @@ depositos/
 movimientos/ — listado + inventario de artículos y de EPP
 movimientos/nuevo/ — paso a paso (entrada, salida, transferencia, entrega EPP)
 movimientos/:id — detalle
-entregas/ — historial de entregas EPP (acordeón + línea de tiempo; Admin/Vista: sidebar; Responsable: su nav)
+entregas/ — historial de entregas EPP (acordeón + línea de tiempo; todos por el sidebar)
 responsables/ — administración de responsables
 notificaciones/ — historial de notificaciones

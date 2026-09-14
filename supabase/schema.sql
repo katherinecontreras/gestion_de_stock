@@ -3449,7 +3449,7 @@ CREATE POLICY admin_all_familias ON public.familias
 DROP POLICY IF EXISTS familias_select ON public.familias;
 CREATE POLICY familias_select ON public.familias
   FOR SELECT TO authenticated
-  USING (estado = 'activo' OR public.fn_es_administrador());
+  USING (estado = 'activo' OR public.fn_es_administrador() OR public.fn_es_vista_descarga());
 
 DROP POLICY IF EXISTS admin_all_grupos ON public.grupos;
 CREATE POLICY admin_all_grupos ON public.grupos
@@ -3460,7 +3460,7 @@ CREATE POLICY admin_all_grupos ON public.grupos
 DROP POLICY IF EXISTS grupos_select ON public.grupos;
 CREATE POLICY grupos_select ON public.grupos
   FOR SELECT TO authenticated
-  USING (estado = 'activo' OR public.fn_es_administrador());
+  USING (estado = 'activo' OR public.fn_es_administrador() OR public.fn_es_vista_descarga());
 
 DROP POLICY IF EXISTS admin_all_articulos ON public.articulos;
 CREATE POLICY admin_all_articulos ON public.articulos
