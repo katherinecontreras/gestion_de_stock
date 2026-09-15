@@ -185,7 +185,7 @@ export default function RecuperarPage() {
             <form className="space-y-3" onSubmit={encontrado ? handleEnviar : handleBuscar}>
                 {!isConfigured ? <Alert>Faltan las claves de Supabase en el .env.</Alert> : null}
                 {error ? <Alert>{error}</Alert> : null}
-                <div className={encontrado ? "grid gap-3 sm:grid-cols-2" : ""}>
+                <div className="space-y-3">
                 <Input
                     label="DNI"
                     inputMode="numeric"
