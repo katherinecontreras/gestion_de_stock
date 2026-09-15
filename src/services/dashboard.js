@@ -278,11 +278,18 @@ export function buildDashboardView({ stock, epp, movimientos, dias, idDeposito =
             bumpRuta(mixRutas.get(mov.tipo), ruta, { movimientos: 1, unidades });
         }
         for (const linea of mov.articulos) {
-            const label = [linea.codigo, linea.nombre].filter(Boolean).join(" – ") || "Artículo";
-            const current = topMap.get(label) ?? { valor: 0, rutas: new Map() };
+            const key = String(linea.id ?? linea.codigo ?? linea.nombre ?? "articulo");
+            const current = topMap.get(key) ?? {
+                valor: 0,
+                nombre: "",
+                codigo: "",
+                rutas: new Map(),
+            };
             current.valor += linea.cantidad;
+            if (linea.nombre) current.nombre = linea.nombre;
+            if (linea.codigo) current.codigo = linea.codigo;
             bumpRuta(current.rutas, ruta, { movimientos: 1, unidades: linea.cantidad });
-            topMap.set(label, current);
+            topMap.set(key, current);
         }
         if (mov.tipo === "Entrega_EPP") {
             const tipoEpp = mov.tipo_entrega_epp || "Ingreso";
@@ -387,8 +394,9 @@ export function buildDashboardView({ stock, epp, movimientos, dias, idDeposito =
         topArticulos: [...topMap.entries()]
             .sort((a, b) => b[1].valor - a[1].valor)
             .slice(0, 8)
-            .map(([name, info]) => ({
-                name,
+            .map(([, info]) => ({
+                name: info.nombre || info.codigo || "Artículo",
+                codigo: info.codigo || "",
                 valor: info.valor,
                 rutas: rutasList(info.rutas),
                 unidad: "unidades",

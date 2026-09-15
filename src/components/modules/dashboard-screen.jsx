@@ -370,7 +370,7 @@ export function DashboardScreen() {
                 <ChartCard
                     className="xl:col-span-2"
                     title="Artículos más movidos"
-                    hint="Suma de cantidades del mes. El detalle muestra de qué depósito a cuál."
+                    hint="Suma de cantidades del mes. El eje muestra el nombre; el detalle, el código y los depósitos."
                 >
                     {hasValues(data?.topArticulos, ["valor"]) ? (
                         <ResponsiveContainer width="100%" height={280}>
@@ -381,7 +381,7 @@ export function DashboardScreen() {
                             >
                                 <CartesianGrid {...GRID} horizontal={false} />
                                 <XAxis type="number" tick={AXIS} allowDecimals={false} />
-                                <YAxis type="category" dataKey="name" width={120} tick={{ ...AXIS, width: 110 }} tickFormatter={(value) => shortName(value, 18)} />
+                                <YAxis type="category" dataKey="name" width={128} tick={{ ...AXIS, width: 118 }} tickFormatter={(value) => shortName(value, 20)} />
                                 <Tooltip {...CHART_TOOLTIP_PROPS} />
                                 <Bar dataKey="valor" name="Cantidad" fill={CHART_COLORS.Entrega_EPP} radius={[0, 4, 4, 0]} isAnimationActive={false} />
                             </BarChart>

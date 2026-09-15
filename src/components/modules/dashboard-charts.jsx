@@ -64,6 +64,7 @@ export function ChartTooltipBox({ active, payload, label, formatter }) {
     return (
         <div className="pointer-events-none relative z-50 max-h-72 w-max max-w-[20rem] overflow-y-auto rounded-xl border border-app-border bg-white px-3 py-2 text-xs shadow-modal">
             {title ? <p className="mb-1 font-semibold text-app-primary">{title}</p> : null}
+            {row.codigo ? <p className="mb-1 text-[11px] text-app-mutedtext">Código: {row.codigo}</p> : null}
             {row.hint ? <p className="mb-1 text-[11px] text-app-mutedtext">{row.hint}</p> : null}
             {visible.map((item) => {
                 const dataKey = item.dataKey ?? item.name;
