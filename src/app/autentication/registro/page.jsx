@@ -10,7 +10,6 @@ import { InternalCode } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/app/layouts/ToastProvider";
 import { sendCodigoIngreso } from "@/lib/emailjs";
-import { createBrowserClient } from "@/lib/supabase";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
     cambiarEmailRegistro,
@@ -19,9 +18,8 @@ import {
     iniciarRegistro,
     listDepositosActivosRegistro,
     reenviarCodigoRegistro,
-    vincularAuthRegistro,
+    crearAuthRegistro,
 } from "@/services/registro";
-import { appPublicHref } from "@/lib/app-url";
 import { slideStep, springSoft, staggerContainer, staggerItem } from "@/utils/motion";
 import { APP_ROUTES } from "@/utils/routes";
 import { digitsOnly, isValidEmail, isValidPassword, passwordsMatch } from "@/utils/validators";
@@ -199,28 +197,7 @@ export default function RegistroPage() {
     }
 
     async function afterCodigoEmitido(result, pass) {
-        const supabase = createBrowserClient();
-        const { error: signError } = await supabase.auth.signUp({
-            email: result.email,
-            password: pass,
-            options: {
-                emailRedirectTo: appPublicHref(APP_ROUTES.login, { dni: result.dni }),
-            },
-        });
-        if (
-            signError
-            && !/already/i.test(signError.message)
-            && !/confirmation email|error sending confirmation/i.test(signError.message)
-        ) {
-            throw signError;
-        }
-        try {
-            await vincularAuthRegistro(result.token);
-        }
-        catch {
-            await supabase.auth.signOut();
-            await vincularAuthRegistro(result.token);
-        }
+        await crearAuthRegistro(result.token, pass);
         try {
             await sendCodigoIngreso({
                 email: result.email,
@@ -233,7 +210,6 @@ export default function RegistroPage() {
         catch (mailError) {
             notify(explainRegistroError(mailError), "error");
         }
-        await supabase.auth.signOut();
         writePending({
             token: result.token,
             email: result.email,
