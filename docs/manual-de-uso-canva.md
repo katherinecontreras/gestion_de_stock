@@ -1,397 +1,458 @@
-# Manual de uso — Gestión de Stock (Simetra)
+# Prompts Canva — una página por vez
 
-Usá este archivo como **guion de Canva**: una página (o dos) por bloque.
-Al final está el **listado de capturas** para sacar con los datos de prueba.
+Colores REALES del PDF (no aproximados):
 
-- **Entrada a la plataforma:** https://gestion-de-stock-woad.vercel.app
-- **Registro:** https://gestion-de-stock-woad.vercel.app/autentication/registro
-- **Login:** https://gestion-de-stock-woad.vercel.app/autentication/login
-
-Colores de la app (para Canva): fondo `#F5F4FD`, violeta `#251D33`, texto `#0F172A`, blanco `#FFFFFF`.
-Tipografía: Poppins. Logo: `public/logo.png`.
-
-Formato sugerido: **Documento A4 vertical**. Título grande + 3–6 pasos numerados + 1 captura por página.
-Exportar: **Compartir → Descargar → PDF**.
-
----
-
-## Página 1 — Portada
-
-**Título:** Manual de uso  
-**Subtítulo:** Gestión de Stock — Simetra Service SA  
-**Texto:** Cómo registrarse, entrar y usar cada pantalla.  
-**Pie:** Versión actual de la plataforma (datos de prueba).
-
-Captura: logo + pantalla de login (sin contraseña visible).
-
----
-
-## Página 2 — ¿Qué es y para qué sirve?
-
-Gestión de Stock es el registro de **artículos**, **depósitos**, **proveedores** y **movimientos**.
-
-Sirve para:
-
-1. Saber **qué hay** y **en qué depósito**.
-2. Cargar **entradas, salidas, transferencias** y **entregas de EPP**.
-3. Ver **quién recibió EPP** y **cuándo hay que recambiarlo** (cada 6 meses).
-4. Descargar **Excel** o el **Word del movimiento** cuando hace falta.
-
-No es un chat ni un mail: es la herramienta de inventario del día a día.
-
----
-
-## Página 3 — Quién usa qué (roles)
-
-| Rol | Qué puede hacer | Qué no puede hacer |
+| Uso | Hex | Dónde se ve |
 |---|---|---|
-| **Administrador** | Ver todo. Cargar, editar, dar de baja. Cargar movimientos. | No se elige al registrarse. Lo asigna otro admin. |
-| **Responsable de depósito** | Ver y mover **solo sus depósitos**. Cargar movimientos y Entrega EPP. | No ve Familias ni Proveedores. No usa la tuerca. |
-| **Vista y descarga** | Ver **todo** igual que el admin. Descargar. | No crea, no edita, no elimina, no carga movimientos. |
-| **Empleado** | Recibe EPP. | **No entra** a la plataforma. Se carga solo al entregar EPP. |
+| Navy | `#1D3256` | Encabezados y pies |
+| Celeste | `#85A7BE` | Bloques (pág. 2) y aviso del login |
+| Gris de hoja | `#DADADA` | Fondo de págs. 4–8 |
+| Hueso | `#F5F5F5` | Cuadros 3 y 4 de “qué es” |
+| Blanco | `#FFFFFF` | Solo las capturas / tarjetas |
 
-Regla de oro: **se entra con DNI + contraseña**, no con el mail.
+El fondo de las páginas de pasos **no es blanco**. Es **`#DADADA`**. Si Canva pone blanco o un gris más claro, está mal.
 
----
+Medidas de la hoja: A4 **210 × 297 mm** (en el PDF: 596 × 843 px).
 
-## Página 4 — Cómo registrarse (paso a paso)
-
-Captura: pantalla de registro.
-
-1. Abrí el link de registro.
-2. Completá **nombre, apellido, email, DNI**.
-3. Elegí el rol: **Responsable de depósito** o **Vista y descarga**.
-4. Escribí la **contraseña dos veces**.
-5. Si sos **Responsable**, marcá **al menos un depósito** de la tabla (podés buscar).
-6. Guardá.
-
-Después te llega un **código de 6 dígitos al mail**.
+Cómo usarlo: **duplicá la página 6 (login)** o la **5**, borré textos y fotos, y pegá **un prompt entero**. No armes un lienzo blanco.
 
 ---
 
-## Página 5 — Código de ingreso
+## Página 9 — crear de cero (Dashboard)
 
-Captura: los 6 casilleros del código.
+```
+Editá SOLO la página actual. Documento A4 vertical 210×297 mm. No crees otro archivo. No toques las páginas 1 a 8.
 
-1. Abrí el mail de Gestión de Stock.
-2. Escribí el código de **6 dígitos** (un número por casillero).
-3. Enviá.
+COPIÁ EL FORMATO DE LAS PÁGINAS 5, 6 Y 8 (no inventes otro). Así están armadas:
 
-Si no llegó:
+1) ENCABEZADO
+- Rectángulo navy #1D3256 que toca los tres bordes: izquierdo, derecho y SUPERIOR.
+- Alto: 30 mm (igual que el encabezado de “¿CÓMO ENTRAR? (LOGIN)”).
+- Título UNA línea, blanco #FFFFFF, MAYÚSCULAS, centrado, mismo tamaño que “¿CÓMO ENTRAR? (LOGIN)”:
+DASHBOARD
+- El título NO va sobre fondo blanco. NO va navy sobre blanco. NO va a la izquierda como un H1 de web.
 
-- **Volver a enviar** (mismo mail).
-- **Cambiar mail** si te equivocaste, guardá, y se reenvía.
+2) FONDO DEL RESTO DE LA HOJA
+- Todo lo que queda debajo del encabezado es #DADADA (el gris medio de las páginas 5, 6, 7 y 8).
+- PROHIBIDO: #FFFFFF como fondo de página, #F5F5F5 como fondo de página, #E8EEF2, beige, violeta, lila, #F5F4FD.
+- Si el fondo no es exactamente #DADADA, está mal.
 
-Cuando el código está bien, vas al **login con el DNI ya puesto**. Solo falta la contraseña.
+3) COLUMNA DE PASOS (izquierda, sobre el gris)
+- Empieza 8 mm debajo del encabezado.
+- Ocupa el 42% izquierdo de la hoja.
+- Números 1, 2 y 3: color #1D3256, grandes como los de la página 6 (login), alineados a la izquierda.
+- Texto al lado, #1D3256, oraciones cortas, voseo.
+SOLO TRES PASOS (no inventes un 4 vacío):
+1  Mes y Año, arriba a la derecha: solo períodos que tienen movimientos.
+2  Depósito: “Todos” o uno solo (solo depósitos con movimiento en ese mes).
+3  Cuatro números: movimientos del mes · unidades en stock · EPP a recambiar · stock en cero.
+Debajo del 3, en texto más chico: Es la primera pantalla al entrar. No se carga ni se edita nada: solo se mira.
 
----
+4) TARJETA DE CAPTURA (derecha, como el recuadro BLANCO del LOGIN, no como un bloque gris gigante)
+- Es un rectángulo BLANCO #FFFFFF apoyado SOBRE el gris #DADADA.
+- NO pega contra el borde superior (el encabezado navy queda arriba, separado).
+- NO pega contra el borde inferior (el pie navy queda abajo, separado).
+- Márgenes: 10 mm a la derecha, 10 mm debajo del encabezado, 14 mm encima del pie.
+- Ancho: 52% de la hoja. Alto: el espacio entre encabezado y pie, menos esos márgenes.
+- Esquinas: radio chico, como la tarjeta del login (aprox. 8–10 px), NO una pastilla tipo “app icon” con radio enorme.
+- Sombra muy suave, como el login.
+- ADENTRO: un FRAME de imagen de Canva (marco clicable). Yo voy a hacer clic y subir la captura; tiene que quedar de ese tamaño.
+- Rótulo gris centrado dentro del frame, mientras esté vacío: CAPTURA 09 — Dashboard completo
+- NUNCA dibujes la interfaz de la plataforma. NUNCA pongas un mockup.
 
-## Página 6 — Cómo entrar (login)
+5) FLECHAS
+- Negras, finas, como en la página 6.
+- Del 1 a la zona SUPERIOR de la tarjeta (filtros mes/año).
+- Del 2 a la zona SUPERIOR DERECHA (select depósito).
+- Del 3 a la zona alta-media (las 4 tarjetas numéricas).
+- No tapen el texto.
 
-Captura: login.
+6) PIE
+- Franja #1D3256 a TODO el ancho, pegada al borde inferior.
+- Alto: 18 mm (más chica que el recuadro “IMPORTANTE” de registro; más como una barra).
+- Texto blanco, centrado, dos líneas:
+El Responsable ve sus depósitos.
+Admin y Vista ven toda la empresa.
 
-1. Entrá a https://gestion-de-stock-woad.vercel.app
-2. DNI + contraseña.
-3. Si no tenés usuario: **Registrarme**.
-4. Si olvidaste la clave: **Recuperar contraseña** (en esta misma pantalla).
+7) Número de página 9, blanco o navy, esquina inferior derecha, chico.
 
-Si tu usuario está **inactivo**, no vas a poder entrar aunque la clave sea correcta. Pedile al administrador que te reactive.
-
----
-
-## Página 7 — Recuperar contraseña
-
-1. En el login, **Recuperar contraseña**.
-2. Te llega un mail.
-3. Abrí el link y cargá la **nueva contraseña dos veces**.
-4. Volvé al login con DNI + la nueva clave.
-
-El administrador **no** te resetea la clave desde la tabla de responsables.
-
----
-
-## Página 8 — Cómo moverse (menú)
-
-Captura: navbar + sidebar (admin o vista) y, en otra foto, sidebar de responsable.
-
-Arriba:
-
-- **Logo / “Gestión de Stock”** → Dashboard.
-- **Campana** → avisos.
-- **Tuerca** (solo Admin y Vista) → responsables e historial de notificaciones.
-- **Perfil** → datos. El Responsable también **Administrar depósitos**.
-- **Cerrar sesión**.
-
-A la izquierda, menú:
-
-- Todos: **Dashboard, Artículos, Depósitos, Movimientos, Entregas EPP**.
-- Admin y Vista también: **Familias, Proveedores**.
-
-Verde arriba al centro = salió bien. Rojo = salió mal. Si vas a eliminar, siempre hay un **modal de confirmación**.
-
----
-
-## Página 9 — Dashboard
-
-Captura: tablero con los datos de prueba + selects de mes, año y depósito.
-
-Es la **primera pantalla** al entrar. **No se carga ni se edita nada acá.** Solo se mira.
-
-Arriba a la derecha:
-
-1. **Mes** y **Año**: solo períodos que tienen movimientos.
-2. **Depósito**: “Todos” o uno solo (solo depósitos con movimiento en ese mes).
-
-Cuatro números:
-
-- Movimientos del mes
-- Unidades en stock
-- EPP a recambiar
-- Stock en cero
-
-Abajo, gráficos. **Pasá el mouse** para ver origen → destino, no solo la cantidad.
-
-El Responsable ve **sus depósitos**. Admin y Vista ven **toda la empresa**.
+CHECK FINAL
+- Encabezado navy a todo el ancho, título blanco.
+- Fondo #DADADA.
+- Una tarjeta blanca a la derecha, no un rectángulo gris que ocupe casi toda la hoja.
+- Tres pasos, ninguno vacío.
+```
 
 ---
 
-## Página 10 — Artículos
+## Página 10 — Dashboard gráficos
 
-Captura: tabla de artículos.
+```
+Editá SOLO esta página. A4 vertical. No toques las demás.
 
-Qué es: el catálogo (código, nombre, familia, grupo, unidad, EPP, costo, estado).
+FORMATO = páginas 5, 6 y 8:
+- Encabezado #1D3256 a todo el ancho, 30 mm de alto, pegado arriba.
+- Título blanco MAYÚSCULAS centrado: DASHBOARD · GRÁFICOS
+- Fondo del resto: #DADADA. Prohibido blanco, violeta, celeste de fondo (el celeste #85A7BE acá NO se usa).
+- Pie inferior #1D3256, 14 mm, texto blanco: En Artículos más movidos el eje Y muestra el nombre; el código se ve al pasar el mouse.
 
-Cómo se usa:
+PASOS a la izquierda (42% ancho), números #1D3256 grandes como en login:
+1  Pasá el mouse por una barra o porción del gráfico.
+2  El detalle muestra origen → destino, no solo la cantidad.
+3  Si filtrás un depósito y queda vacío, ese depósito no tuvo movimiento ese mes.
 
-1. Buscá por nombre.
-2. Filtrá por familia / grupo.
-3. **Ver historial** → movimientos, stock por depósito y costos de ese artículo.
-4. **Descargar archivos** si necesitás Excel.
-
-Solo **Administrador**:
-
-- Cargar artículo
-- Carga masiva (Excel)
-- Editar / Eliminar
-
-Si el artículo ya tiene movimientos, **Eliminar** no lo borra: lo deja **inactivo**.
-
-El **Responsable** solo ve artículos de **sus depósitos**. **Vista** ve todo y no edita.
-
----
-
-## Página 11 — Historial del artículo
-
-Captura: las 3 pestañas.
-
-1. **Movimientos** (la de entrada): qué se movió, cuándo, depósitos. Si es EPP, el empleado y la fecha de recambio.
-2. **Depósitos**: stock actual por depósito.
-3. **Historial de costos**: cómo cambió el precio.
+DOS TARJETAS BLANCAS #FFFFFF sobre el gris, a la derecha, IGUALES entre sí (como las varias capturas de la página 7, no un solo bloque):
+- Ancho 50% de la hoja. Alto 38 mm? NO: alto de cada una ~95 mm. Separación 8 mm.
+- Radio de esquina chico. Sombra leve. 10 mm de margen derecho.
+- Arriba, FRAME clicable: CAPTURA 10A — Dashboard filtrado a un depósito
+- Abajo, FRAME clicable: CAPTURA 10B — Hover origen → destino
+Flecha del 3 a 10A. Flecha del 1 y 2 a 10B.
+No dibujes la app. No dejes un paso 4 vacío. Número de página 10.
+```
 
 ---
 
-## Página 12 — Familias y grupos
+## Página 11 — Artículos
 
-Captura: tabla de familias + botón Ver grupos / Gestionar.
+```
+Editá SOLO esta página. A4. Formato de las páginas 5–8.
 
-La familia agrupa (ej. EPP, herramientas). El **grupo** va debajo (ej. cascos, guantes).
+Encabezado #1D3256, 30 mm, todo el ancho, pegado arriba.
+Título blanco MAYÚSCULAS: ARTÍCULOS
+Fondo #DADADA. Prohibido fondo blanco.
 
-- **Vista:** Ver grupos (solo lectura) y descargar.
-- **Admin:** cargar familia, carga masiva de grupos, editar, eliminar, gestionar artículos del grupo.
+Izquierda 42%, números grandes #1D3256:
+1  Buscá por nombre.
+2  Filtrá por familia / grupo.
+3  Ver historial → movimientos, stock por depósito y costos.
+4  Descargar archivos si necesitás Excel.
+Texto chico: Catálogo: código, nombre, familia, grupo, unidad, EPP, costo, estado.
 
-No se crean familias en el Excel de grupos: las familias se cargan **una por una**.
+Derecha: UNA tarjeta blanca #FFFFFF sobre el gris (como el login, pero más alta).
+Márgenes 10 mm derecha, 10 mm bajo encabezado, 14 mm sobre el pie.
+FRAME clicable: CAPTURA 11 — Tabla de artículos
+Flecha 1 → buscador (arriba del frame). Flecha 3 → una fila.
 
----
-
-## Página 13 — Proveedores
-
-Captura: tabla de proveedores.
-
-Quién los usa: **Admin** (carga/edita) y **Vista** (ve y descarga). El Responsable **no** tiene esta pantalla.
-
-Sirven para las **entradas** (de quién vino el material) y para **devoluciones**.
-
----
-
-## Página 14 — Depósitos
-
-Captura: tabla de depósitos.
-
-Cada depósito tiene código, nombre, ubicación y responsables.
-
-- **Admin:** alta, Excel, asignar responsables.
-- **Vista:** ver y descargar.
-- **Responsable:** solo **los suyos**. Puede cambiarlos desde el **perfil → Administrar depósitos** (mínimo uno).
+Pie #1D3256, 22 mm, todo el ancho, texto blanco:
+Solo Administrador carga, edita o elimina. Si ya tiene movimientos, Eliminar lo deja inactivo. El Responsable ve los de sus depósitos. Vista ve todo y no edita.
+Página 11.
+```
 
 ---
 
-## Página 15 — Movimientos (el corazón)
+## Página 12 — Historial del artículo
 
-Captura: tabla de movimientos + pestañas Inventario artículos / Inventario EPP.
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
 
-Acá se ve **todo lo que se movió**.
+Encabezado #1D3256, 30 mm, ancho completo.
+Título blanco: HISTORIAL DEL ARTÍCULO
+Fondo #DADADA.
 
-Tres pestañas:
+Izquierda:
+1  Movimientos: qué se movió, cuándo, depósitos. Si es EPP: empleado y fecha de recambio.
+2  Depósitos: stock actual por depósito.
+3  Historial de costos: cómo cambió el precio.
 
-1. **Movimientos** — historial.
-2. **Inventario de artículos** — stock en estantería.
-3. **Inventario EPP** — lo que tiene puesto cada empleado + alerta de recambio.
+Derecha: tarjeta blanca sobre el gris, FRAME: CAPTURA 12 — Historial, pestaña Movimientos
+Flecha 1 → pestañas de arriba del frame.
 
-**Ver detalle** abre la ficha. Ahí está **Descargar Word** (comprobante).
-
-**Nuevo movimiento** (Admin y Responsable). Vista **no** carga.
-
----
-
-## Página 16 — Nuevo movimiento: los 4 pasos
-
-Captura: barra de pasos.
-
-No podés saltar un paso vacío. Podés **volver** sin perder lo cargado.
-
-**Paso 1 — Tipo**
-
-- Entrada
-- Salida
-- Transferencia
-- Entrega EPP
-
-**Paso 2 — Datos**
-
-Siempre: **nro. de remito** + **foto(s) del remito** (puede haber más de una hoja).
-
-- **Entrada:** depósito destino + proveedor.
-- **Salida:** origen, destino, si es devolución (y proveedor si sí).
-- **Transferencia:** origen, destino, motivo (opcional).
-- **Entrega EPP:** origen, destino (distinto), tipo (Ingreso / Recambio por rotura / Recambio por talle), empleado.
-
-**Empleado:** buscá por nombre, apellido o DNI. Si no está, lo creás ahí (sin mail). Un movimiento = **un** empleado.
-
-**Paso 3 — Artículos**
-
-Tildá, poné **cantidad** (obligatoria) y observación (opcional).  
-Entrada: todo el catálogo. Salida/transferencia: stock del origen. EPP: solo artículos EPP.
-
-**Paso 4 — Revisar y cargar**
-
-Leé todo. Si está mal, corregí acá. Recién al final se guarda.
+Pie #1D3256, 16 mm: Se abre desde Artículos → Ver historial.
+Página 12. No dibujes la app. No uses otro gris que #DADADA.
+```
 
 ---
 
-## Página 17 — Qué hace cada movimiento al stock
+## Página 13 — Familias y grupos
 
-| Tipo | Estantería | Extra |
-|---|---|---|
-| Entrada | Suma en el **destino** | — |
-| Salida | Resta en el **origen** | — |
-| Transferencia | Resta origen, suma destino | — |
-| Entrega EPP | Resta en el **origen** | El EPP queda en el **empleado**, no en la estantería del destino |
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
 
-Recambio EPP: **fecha del movimiento + 6 meses**, automático.  
-Se considera recambiado cuando hay **otra Entrega EPP al mismo empleado**.
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: FAMILIAS Y GRUPOS
+Fondo #DADADA.
 
----
+1  La familia agrupa (ej. EPP). El grupo va debajo (ej. cascos).
+2  Vista: Ver grupos (solo lectura) y descargar.
+3  Admin: cargar familia, Excel de grupos, editar, eliminar, gestionar artículos del grupo.
 
-## Página 18 — Entregas EPP
+Tarjeta blanca derecha, FRAME: CAPTURA 13 — Tabla de familias + Ver grupos
 
-Captura: lista de empleados + acordeón abierto (línea de tiempo).
-
-Menú: **Entregas EPP**.
-
-1. Buscá al empleado.
-2. Abrí la fila.
-3. Ves todas las entregas: fecha, tipo, depósitos, remito, quién entregó, recambio.
-
-Admin y Vista: todos. Responsable: los de **sus depósitos**.
+Pie #1D3256, 18 mm, blanco: No se crean familias en el Excel de grupos: se cargan una por una.
+Página 13.
+```
 
 ---
 
-## Página 19 — Campana y tuerca
+## Página 14 — Proveedores
 
-Captura: campana abierta + menú tuerca.
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
 
-**Campana (todos):** avisos (movimientos, altas, recambio EPP, etc.).
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: PROVEEDORES
+Fondo #DADADA. Sin franja celeste.
 
-**Tuerca (solo Admin y Vista):**
+1  Admin carga y edita. Vista ve y descarga.
+2  El Responsable NO tiene esta pantalla (no está en su menú).
+3  Sirven para las entradas y para las devoluciones.
 
-- Administrar responsables
-- Historial de notificaciones
-
-El **Responsable no tiene tuerca**.
-
----
-
-## Página 20 — Administrar responsables (Admin)
-
-Captura: tabla de responsables.
-
-El alta **no** se hace acá: cada uno se **registra solo**.
-
-El Admin puede **editar** (rol, estado, depósitos) o **eliminar**.  
-Si esa persona ya cargó movimientos, **no se elimina**: se pasa a **inactivo** y no entra más.
-
-Vista ve la tabla y no edita.
+Tarjeta blanca derecha, FRAME: CAPTURA 14 — Tabla de proveedores
+Sin pie navy, o uno de 12 mm vacío de texto. Página 14.
+```
 
 ---
 
-## Página 21 — Errores frecuentes
+## Página 15 — Depósitos
 
-1. Entro con el **mail** → no. Es **DNI + contraseña**.
-2. No me llega el código → spam, reenviar, o cambiar el mail.
-3. No veo Familias / Proveedores → sos **Responsable**. Es normal.
-4. No puedo cargar movimiento → sos **Vista y descarga**.
-5. El Dashboard está vacío al filtrar un depósito → elegí uno que tenga movimientos ese mes, o “Todos”.
-6. No puedo borrar un artículo/depósito/persona → ya tiene historial: **inactivar**.
-7. Entrega EPP a dos personas → son **dos movimientos**.
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
 
----
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: DEPÓSITOS
+Fondo #DADADA.
 
-## Página 22 — Contacto / cierre
+1  Cada depósito: código, nombre, ubicación y responsables.
+2  Admin: alta, Excel, asignar responsables. Vista: ver y descargar.
+3  Responsable: solo los suyos. Los cambia en perfil → Administrar depósitos (mínimo uno).
 
-Si algo falla: no recargues mil veces. Anotá **qué pantalla**, **qué botón** y **el mensaje rojo** (toast) y avisá a quien administra la plataforma.
-
----
-
-# Listado de capturas (en este orden)
-
-Entrá como **Administrador** con los datos de prueba. Ocultá contraseñas y mails personales si hace falta.
-
-1. Login (completa, sin clave escrita).
-2. Registro (formulario).
-3. Código de 6 dígitos (si no tenés uno activo, recuadrá esa zona en un registro de prueba).
-4. Dashboard completo (mes con movimientos, Todos los depósitos).
-5. Dashboard filtrado a **un** depósito.
-6. Hover de un gráfico (origen → destino).
-7. Sidebar Admin / Vista (se ven Familias y Proveedores).
-8. Sidebar Responsable (sin Familias ni Proveedores).
-9. Artículos (tabla).
-10. Historial de un artículo (pestaña movimientos).
-11. Familias.
-12. Detalle de una familia (grupos).
-13. Proveedores.
-14. Depósitos.
-15. Movimientos (lista).
-16. Inventario de artículos.
-17. Inventario EPP (si hay alerta, mejor).
-18. Detalle de un movimiento (con Descargar Word visible).
-19. Nuevo movimiento — paso 1 (tipos).
-20. Nuevo movimiento — paso 2 (un ejemplo de Entrada y uno de Entrega EPP).
-21. Nuevo movimiento — paso 3 (artículos tildados).
-22. Nuevo movimiento — paso 4 (revisión).
-23. Entregas EPP (empleado abierto).
-24. Campana.
-25. Tuerca + responsables.
-26. Toast verde de “guardado OK”.
-27. Modal de confirmar eliminar (sin confirmar de verdad).
+Tarjeta blanca derecha, FRAME: CAPTURA 15 — Tabla de depósitos
+Página 15.
+```
 
 ---
 
-# Cómo armarlo en Canva (10 minutos de método)
+## Página 16 — Movimientos
 
-1. Canva → **Crear un diseño** → **Documento A4**.
-2. Página 1: fondo violeta `#251D33`, logo, título blanco.
-3. Resto: fondo `#F5F4FD`, título `#251D33`, cuerpo gris oscuro.
-4. En cada página: **título + pasos 1. 2. 3. + captura**.
-5. Recuadrá en la captura el botón que hay que tocar (Canva → Elementos → formas, borde naranja).
-6. Abajo a la derecha: número de página.
-7. **Descargar PDF** (estándar o imprimir). Ese PDF es el adjunto del mail.
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: MOVIMIENTOS
+Fondo #DADADA.
+
+1  Pestaña Movimientos: historial. Ver detalle abre la ficha (Descargar Word).
+2  Pestaña Inventario de artículos: stock en estantería.
+3  Pestaña Inventario EPP: lo que tiene puesto cada empleado + alerta de recambio.
+
+Tarjeta blanca derecha, FRAME: CAPTURA 16 — Lista con las 3 pestañas
+Flechas 1, 2 y 3 hacia las pestañas de ARRIBA del frame.
+
+Pie #1D3256, 18 mm: Nuevo movimiento = Admin y Responsable. Vista no carga.
+Página 16.
+```
+
+---
+
+## Página 17 — Inventarios
+
+```
+Editá SOLO esta página. A4. Formato de la página 7 (varias tarjetas blancas sobre #DADADA), NO un solo recuadro.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: INVENTARIO DE ARTÍCULOS · EPP
+Fondo #DADADA.
+
+Izquierda:
+1  En Movimientos, abrí Inventario de artículos.
+2  Cambiá a Inventario EPP.
+3  Si hay alerta de recambio (cada 6 meses), que se vea.
+
+Derecha, DOS tarjetas blancas iguales (como pág. 7):
+Arriba FRAME: CAPTURA 17A — Inventario de artículos
+Abajo FRAME: CAPTURA 17B — Inventario EPP
+Alto de cada una ~100 mm, separación 8 mm, margen derecho 10 mm.
+Página 17. No dibujes pantallas.
+```
+
+---
+
+## Página 18 — Detalle del movimiento
+
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: DETALLE DEL MOVIMIENTO
+Fondo #DADADA.
+
+1  En la lista, Ver detalle.
+2  Revisá tipo, depósitos, remito, artículos.
+3  Descargar Word (comprobante).
+
+Tarjeta blanca derecha, FRAME: CAPTURA 18 — Detalle con Descargar Word visible
+Flecha 3 → botón Word.
+Página 18.
+```
+
+---
+
+## Página 19 — Nuevo movimiento (resumen)
+
+```
+Editá SOLO esta página. A4.
+
+ARRIBA: encabezado #1D3256, 30 mm, ancho completo, título blanco: NUEVO MOVIMIENTO
+FONDO: #DADADA (no blanco).
+
+Debajo del encabezado, texto navy: No se puede saltar un paso vacío. Se puede volver sin perder lo cargado.
+
+CUATRO BLOQUES en damero 2×2, IGUAL que la página 2 (colores reales):
+- Arriba izquierda: #85A7BE, número 1 blanco o navy grande, texto: Tipo
+- Arriba derecha: #F5F5F5, número 2, texto: Datos
+- Abajo izquierda: #F5F5F5, número 3, texto: Artículos
+- Abajo derecha: #85A7BE, número 4, texto: Revisar y cargar
+Los cuatro bloques juntos ocupan el 55% superior del cuerpo (debajo del encabezado). Como pág. 2, sin logo al centro si no entra.
+
+ABAJO, una tarjeta blanca apaisada (más ancha que alta, alto 70 mm, ancho 170 mm, centrada):
+FRAME: CAPTURA 19 — Barra de los 4 pasos
+Ese frame NO va de arriba abajo de la hoja.
+Página 19.
+```
+
+---
+
+## Página 20 — Tipo y datos
+
+```
+Editá SOLO esta página. A4. Formato página 7: gris #DADADA + varias tarjetas blancas.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: NUEVO MOVIMIENTO · TIPO Y DATOS
+Fondo #DADADA.
+
+Izquierda, texto compacto:
+1  Tipo: Entrada · Salida · Transferencia · Entrega EPP.
+2  Siempre: nro. de remito + foto(s) del remito.
+   Entrada: destino + proveedor.
+   Salida: origen, destino, si es devolución.
+   Transferencia: origen, destino, motivo opcional.
+   Entrega EPP: origen, destino distinto, tipo (Ingreso / Recambio por rotura / Recambio por talle), un empleado.
+
+Dos tarjetas blancas a la derecha:
+CAPTURA 20A — Paso 1 (los 4 tipos)
+CAPTURA 20B — Paso 2 (Entrada o Entrega EPP)
+
+Pie #1D3256, 18 mm: Un movimiento EPP = un empleado. Si no está, se crea ahí (sin mail).
+Página 20.
+```
+
+---
+
+## Página 21 — Artículos y revisión
+
+```
+Editá SOLO esta página. A4. Formato página 7.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: NUEVO MOVIMIENTO · ARTÍCULOS Y REVISIÓN
+Fondo #DADADA.
+
+1  Paso 3: tildá, cantidad obligatoria, observación opcional. Entrada = catálogo. Salida/transferencia = stock del origen. EPP = solo artículos EPP.
+2  Paso 4: leé todo. Si está mal, corregí. Recién al final se guarda.
+
+Dos tarjetas blancas:
+CAPTURA 21A — Paso 3 (artículos tildados)
+CAPTURA 21B — Paso 4 (revisión)
+Página 21.
+```
+
+---
+
+## Página 22 — Qué hace cada movimiento (sin foto)
+
+```
+Editá SOLO esta página. A4. COPIÁ LA PÁGINA 3 (roles), no la 6.
+
+Encabezado #1D3256 a todo el ancho, 44 mm de alto (como “¿QUIÉN USA QUÉ?”), título blanco MAYÚSCULAS:
+QUÉ HACE CADA MOVIMIENTO AL STOCK
+
+Cuerpo: filas a TODO el ancho, alternando #85A7BE y #DADADA, como la tabla de roles. SIN recuadro de captura. SIN fondo blanco de hoja.
+
+Fila títulos (gris #DADADA): Tipo | Estantería | Extra
+Fila #85A7BE: Entrada | Suma en el destino | —
+Fila #DADADA: Salida | Resta en el origen | —
+Fila #85A7BE: Transferencia | Resta origen, suma destino | —
+Fila #DADADA: Entrega EPP | Resta en el origen | El EPP queda en el empleado, no en la estantería del destino
+
+Abajo, franja #1D3256, ~22 mm: Recambio EPP = fecha del movimiento + 6 meses. Se considera recambiado cuando hay otra Entrega EPP al mismo empleado.
+Rombo logo Simetra chico abajo al centro, como pág. 3.
+Página 22. Cero frames de imagen.
+```
+
+---
+
+## Página 23 — Entregas EPP
+
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: ENTREGAS EPP
+Fondo #DADADA.
+
+1  En el menú, Entregas EPP. Buscá al empleado.
+2  Abrí la fila.
+3  Ves fecha, tipo, depósitos, remito, quién entregó, recambio.
+
+Tarjeta blanca derecha, FRAME: CAPTURA 23 — Empleado abierto (línea de tiempo)
+
+Pie #1D3256, 16 mm: Admin y Vista: todos. Responsable: los de sus depósitos.
+Página 23.
+```
+
+---
+
+## Página 24 — Administrar responsables
+
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: ADMINISTRAR RESPONSABLES
+Fondo #DADADA.
+
+1  Se entra por la tuerca (solo Admin y Vista). Ya está en la página 8.
+2  El alta NO se hace acá: cada uno se registra solo.
+3  Admin edita rol, estado y depósitos, o elimina. Si ya cargó movimientos, no se elimina: queda inactivo. Vista ve y no edita.
+
+Tarjeta blanca derecha, FRAME: CAPTURA 24 — Tabla de responsables
+Página 24.
+```
+
+---
+
+## Página 25 — Errores frecuentes (sin foto)
+
+```
+Editá SOLO esta página. A4. COPIÁ LA PÁGINA 2 (damero), no la 6.
+
+Encabezado #1D3256, 44 mm, ancho completo. Título blanco: ERRORES FRECUENTES
+SIN frame de captura. SIN fondo blanco.
+
+Debajo del header hay una franja #DADADA de ~40 mm? En la pág. 2 hay una banda gris con la intro. Acá poné una línea: Se entra con DNI + contraseña, no con el mail.
+
+Luego 7 bloques. Paleta SOLO #85A7BE, #F5F5F5, #DADADA, texto #1D3256, números grandes como pág. 2:
+1  Entro con el mail → no. Es DNI + contraseña.   fondo #85A7BE
+2  No me llega el código → spam, reenviar o cambiar el mail.   #F5F5F5
+3  No veo Familias / Proveedores → sos Responsable. Es normal.   #F5F5F5
+4  No puedo cargar movimiento → sos Vista y descarga.   #85A7BE
+5  Dashboard vacío al filtrar → otro depósito o “Todos”.   #85A7BE
+6  No puedo borrar si hay historial → inactivar.   #F5F5F5
+7  EPP a dos personas → dos movimientos.   #DADADA a todo el ancho abajo
+
+Distribución: 2×2, 2×2, y el 7 a lo ancho. Logo rombo al centro si queda hueco, como pág. 2.
+Página 25.
+```
+
+---
+
+## Página 26 — Cierre
+
+```
+Editá SOLO esta página. A4. Formato páginas 5–8.
+
+Encabezado #1D3256, 30 mm, ancho completo. Título blanco: SI ALGO FALLA
+Fondo #DADADA.
+
+Texto navy a la izquierda: No recargues mil veces. Anotá qué pantalla, qué botón y el mensaje rojo o verde (toast) y avisá a quien administra la plataforma.
+
+Dos tarjetas blancas más chicas (alto 80 mm cada una):
+CAPTURA 26A — Toast verde de guardado OK
+CAPTURA 26B — Modal de confirmar eliminar (sin confirmar)
+
+Pie #1D3256, 22 mm, blanco:
+Gestión de Stock — Simetra Service S.A.
+Diseñado por Katherine Contreras.
+Página 26.
+```

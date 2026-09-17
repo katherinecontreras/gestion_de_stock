@@ -390,7 +390,7 @@ export async function listDepositosOpciones() {
     const supabase = createBrowserClient();
     const { data, error } = await supabase
         .from("depositos")
-        .select("id, codigo, nombre, estado")
+        .select("id, codigo, nombre, estado, cant_articulos")
         .order("codigo", { ascending: true });
     if (error) throw error;
     return data ?? [];

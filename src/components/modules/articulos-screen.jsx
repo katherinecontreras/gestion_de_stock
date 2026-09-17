@@ -131,6 +131,10 @@ export function ArticulosScreen() {
     const canHistorial = isAdmin || Boolean(perfil?.esVistaDescarga) || isResponsable;
     const showActions = canWrite || canHistorial;
     const soloMisDepositos = isResponsable;
+    const depositosConArchivos = useMemo(
+        () => depositos.filter((dep) => Number(dep.cant_articulos ?? 0) > 0 && (dep.estado === "activo" || isAdmin)),
+        [depositos, isAdmin],
+    );
 
     const listFiltros = useMemo(() => ({
         search,
@@ -897,14 +901,25 @@ export function ArticulosScreen() {
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => setDownloadOpen(false)}>Cancelar</Button>
-                        <Button onClick={() => void handleDownload()}>Descargar</Button>
+                        <Button
+                            onClick={() => void handleDownload()}
+                            disabled={downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length)}
+                        >
+                            Descargar
+                        </Button>
                     </>
                 }
             >
                 <div className="space-y-3">
                     <select
                         value={downloadMode}
-                        onChange={(event) => setDownloadMode(event.target.value)}
+                        onChange={(event) => {
+                            const next = event.target.value;
+                            setDownloadMode(next);
+                            if (next === "deposito" && !depositosConArchivos.some((dep) => dep.id === downloadDeposito)) {
+                                setDownloadDeposito("");
+                            }
+                        }}
                         className="w-full rounded-control border border-app-input bg-app-surface px-3 py-2 text-sm focus:border-app-focus focus:ring-1 focus:ring-app-focus"
                     >
                         <option value="todos">Todos los artículos</option>
@@ -915,16 +930,20 @@ export function ArticulosScreen() {
                         <p className="text-xs text-app-mutedtext">Solo se incluye lo de tus depósitos.</p>
                     ) : null}
                     {downloadMode === "deposito" ? (
-                        <SearchSelect
-                            value={downloadDeposito}
-                            onChange={setDownloadDeposito}
-                            emptyOption="Elegí un depósito"
-                            placeholder="Buscar depósito…"
-                            options={depositos.filter((d) => d.estado === "activo" || isAdmin).map((d) => ({
-                                value: d.id,
-                                label: `${d.codigo} – ${d.nombre}`,
-                            }))}
-                        />
+                        depositosConArchivos.length ? (
+                            <SearchSelect
+                                value={downloadDeposito}
+                                onChange={setDownloadDeposito}
+                                emptyOption="Elegí un depósito"
+                                placeholder="Buscar depósito…"
+                                options={depositosConArchivos.map((d) => ({
+                                    value: d.id,
+                                    label: `${d.codigo} – ${d.nombre}`,
+                                }))}
+                            />
+                        ) : (
+                            <p className="text-sm text-app-mutedtext">No hay depósitos con artículos para descargar.</p>
+                        )
                     ) : null}
                     {downloadMode === "familia" ? (
                         <div className="grid gap-2 sm:grid-cols-2">
