@@ -297,21 +297,52 @@ export async function listArticulosPagina({
 }
 
 export async function listArticulosExport(filtros = {}) {
-    const all = [];
-    let page = 0;
-    let total = Infinity;
-    while (all.length < total) {
-        const result = await listArticulosPagina({
-            ...filtros,
-            page,
-            pageSize: 1000,
-        });
-        total = result.total;
-        all.push(...result.rows);
-        if (result.rows.length === 0) break;
-        page += 1;
+    const supabase = createBrowserClient();
+    const { idFamilia = "", idGrupo = "", soloMisDepositos = false } = filtros;
+    const idsPropios = soloMisDepositos
+        ? await idsArticulosEnInventarioPropio(supabase)
+        : null;
+    if (idsPropios && idsPropios.length === 0) return [];
+
+    async function fetchChunk(ids = null) {
+        const collected = [];
+        let from = 0;
+        const pageSize = 500;
+        while (true) {
+            let query = supabase
+                .from("articulos")
+                .select(ARTICULO_TABLE_SELECT)
+                .order("codigo", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, from + pageSize - 1);
+            if (ids) query = query.in("id", ids);
+            const filtered = await applyArticuloFiltrosTabla(supabase, query, {
+                search: "",
+                idFamilia,
+                idGrupo,
+                epp: "todos",
+            });
+            if (filtered.empty) return collected;
+            const { data, error } = await filtered.query;
+            if (error) throw error;
+            const rows = data ?? [];
+            collected.push(...rows.map((row) => mapArticuloDesdeTabla(row, null)));
+            if (rows.length < pageSize) break;
+            from += pageSize;
+        }
+        return collected;
     }
-    return all;
+
+    if (idsPropios && idsPropios.length > 120) {
+        const collected = [];
+        for (const chunk of chunkIds(idsPropios)) {
+            collected.push(...await fetchChunk(chunk));
+        }
+        collected.sort((a, b) => compareArticulos(a, b, { key: "codigo", dir: "asc" }));
+        return collected;
+    }
+
+    return fetchChunk(idsPropios);
 }
 
 export async function nextArticuloCodigoSugerido() {

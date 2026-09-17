@@ -122,6 +122,7 @@ export function ArticulosScreen() {
     const [downloadDeposito, setDownloadDeposito] = useState("");
     const [downloadFamilia, setDownloadFamilia] = useState("");
     const [downloadGrupo, setDownloadGrupo] = useState("");
+    const [downloading, setDownloading] = useState(false);
     const fileInputRef = useRef(null);
 
     const isAdmin = Boolean(perfil?.esAdministrador);
@@ -370,12 +371,14 @@ export function ArticulosScreen() {
     }
 
     async function handleDownload() {
+        if (downloading) return;
+        if (downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length)) {
+            notify("Elegí un depósito con artículos.", "error");
+            return;
+        }
+        setDownloading(true);
         try {
             if (downloadMode === "deposito") {
-                if (!downloadDeposito) {
-                    notify("Elegí un depósito.", "error");
-                    return;
-                }
                 const dep = depositos.find((d) => d.id === downloadDeposito);
                 const data = await listArticulosPorDeposito(downloadDeposito);
                 downloadArticulosExcel(data, `articulos-${dep?.codigo ?? "deposito"}.xlsx`, ["CANTIDAD"]);
@@ -393,6 +396,8 @@ export function ArticulosScreen() {
             notify("Excel descargado.", "success");
         } catch (error) {
             notify(explainArticuloError(error), "error");
+        } finally {
+            setDownloading(false);
         }
     }
 
@@ -903,9 +908,13 @@ export function ArticulosScreen() {
                         <Button variant="secondary" onClick={() => setDownloadOpen(false)}>Cancelar</Button>
                         <Button
                             onClick={() => void handleDownload()}
-                            disabled={downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length)}
+                            disabled={
+                                downloading
+                                || (downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length))
+                            }
                         >
-                            Descargar
+                            {downloading ? <Spinner className="h-4 w-4 text-white" /> : null}
+                            {downloading ? "Descargando…" : "Descargar"}
                         </Button>
                     </>
                 }
