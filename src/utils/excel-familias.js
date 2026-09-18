@@ -37,6 +37,7 @@ function quoteSheetName(name) {
         return name;
     return `'${name.replace(/'/g, "''")}'`;
 }
+export { quoteSheetName };
 export function excelSheetName(codigo, used) {
     const cleaned = codigo.replace(/[:\\/?*[\]]/g, "-").trim() || "Familia";
     let base = cleaned.slice(0, 31);

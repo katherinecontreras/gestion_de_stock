@@ -61,7 +61,7 @@ export async function notificarCambioEstadoFamiliaGrupo({ tabla, id, codigo, des
     else if (tabla === "articulos") {
         texto = estado === "activo"
             ? `Se reactivó el artículo ${label}.`
-            : `Se inhabilitó el artículo ${label}.`;
+            : `Se inhabilitó el artículo ${label}. Ya no se puede usar en movimientos nuevos. El historial se conserva.`;
     }
     else {
         texto = estado === "activo"

@@ -2,6 +2,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { nextFamiliaCodigo } from "./familias";
 import { errorText, explainMissingDbFunction } from "./db-errors";
 import { notificarCambioEstadoFamiliaGrupo } from "./notificaciones";
+import { labelTipoMovimiento } from "@/utils/movimientos";
 
 const ARTICULO_SELECT =
     "id, codigo, nombre, unidad_de_medida, is_epp, estado, id_grupo, id_familia, grupo_codigo, grupo_descripcion, familia_codigo, familia_descripcion, costo_actual";
@@ -130,7 +131,10 @@ export function explainArticuloError(errorOrMessage, code) {
         return "No tenés permiso para gestionar artículos.";
     }
     if (/hay movimientos en el historial/i.test(message)) {
-        return "No se puede eliminar: hay movimientos en el historial. Poné el estado en Inactivo.";
+        return "No se puede eliminar: hay movimientos en el historial. Desactivalo para que no se puedan hacer más movimientos con él.";
+    }
+    if (resolvedCode === "23503") {
+        return "No se puede eliminar: hay registros relacionados. Desactivalo para que no se puedan hacer más movimientos con él.";
     }
     if (/is_epp|column .* does not exist/i.test(message)) {
         return "Falta la columna is_epp en artículos. Pegá el SQL del chat en el SQL Editor.";
@@ -199,6 +203,44 @@ function chunkIds(ids, size = 120) {
     return chunks;
 }
 
+function uniqueById(rows) {
+    const seen = new Set();
+    const unique = [];
+    for (const row of rows ?? []) {
+        if (!row?.id || seen.has(row.id)) continue;
+        seen.add(row.id);
+        unique.push(row);
+    }
+    return unique;
+}
+
+function embedOne(value) {
+    return Array.isArray(value) ? value[0] ?? null : (value ?? null);
+}
+
+function fraseTipoMovimiento(tipo, cantidad) {
+    const n = Number(cantidad) || 0;
+    if (tipo === "Entrada") return n === 1 ? "1 entrada" : `${n} entradas`;
+    if (tipo === "Salida") return n === 1 ? "1 salida" : `${n} salidas`;
+    if (tipo === "Transferencia") return n === 1 ? "1 transferencia" : `${n} transferencias`;
+    if (tipo === "Entrega_EPP") return n === 1 ? "1 entrega EPP" : `${n} entregas EPP`;
+    const label = labelTipoMovimiento(tipo).toLowerCase();
+    return n === 1 ? `1 ${label}` : `${n} ${label}`;
+}
+
+export function fraseMovimientosArticulo(resumen) {
+    const parts = (resumen?.porTipo ?? []).map((item) => fraseTipoMovimiento(item.tipo, item.cantidad));
+    if (parts.length === 0) {
+        const total = Number(resumen?.total) || 0;
+        if (total === 1) return "1 movimiento";
+        if (total > 1) return `${total} movimientos`;
+        return "";
+    }
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return `${parts[0]} y ${parts[1]}`;
+    return `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
+}
+
 function compareArticulos(a, b, sort) {
     const dir = sort.dir === "desc" ? -1 : 1;
     if (sort.key === "costo") {
@@ -253,9 +295,10 @@ export async function listArticulosPagina({
             }
         }
         collected.sort((a, b) => compareArticulos(a, b, sort));
+        const unique = uniqueById(collected);
         return {
-            rows: collected.slice(from, to + 1),
-            total: collected.length,
+            rows: unique.slice(from, to + 1),
+            total: unique.length,
         };
     }
 
@@ -270,7 +313,7 @@ export async function listArticulosPagina({
             .range(from, to);
         if (error) throw error;
         return {
-            rows: (data ?? []).map(mapArticulo),
+            rows: uniqueById((data ?? []).map(mapArticulo)),
             total: count ?? 0,
         };
     }
@@ -291,7 +334,7 @@ export async function listArticulosPagina({
     const rows = data ?? [];
     const costos = await costosActualesPorArticulos(supabase, rows.map((row) => row.id));
     return {
-        rows: rows.map((row) => mapArticuloDesdeTabla(row, costos.get(row.id) ?? null)),
+        rows: uniqueById(rows.map((row) => mapArticuloDesdeTabla(row, costos.get(row.id) ?? null))),
         total: count ?? 0,
     };
 }
@@ -427,34 +470,61 @@ export async function listDepositosOpciones() {
     return data ?? [];
 }
 
-export async function listArticulosPorDeposito(idDeposito) {
+const INVENTARIO_ARTICULO_SELECT =
+    "id_deposito, cantidad_actual, articulos:id_articulo ( id, codigo, nombre, unidad_de_medida, is_epp, estado, grupos:id_grupo ( codigo, descripcion, familias:id_familia ( codigo, descripcion ) ) )";
+
+function mapInventarioArticulo(row) {
+    const art = Array.isArray(row.articulos) ? row.articulos[0] : row.articulos;
+    if (!art) return null;
+    const grupo = Array.isArray(art.grupos) ? art.grupos[0] : art.grupos;
+    const familia = grupo
+        ? (Array.isArray(grupo.familias) ? grupo.familias[0] : grupo.familias)
+        : null;
+    return {
+        id_deposito: row.id_deposito ?? null,
+        codigo: art.codigo,
+        nombre: art.nombre,
+        unidad_de_medida: art.unidad_de_medida,
+        is_epp: art.is_epp === true || art.is_epp === "t" || art.is_epp === "true" || art.is_epp === "X",
+        estado: art.estado,
+        familia_codigo: familia?.codigo ?? "",
+        familia_descripcion: familia?.descripcion ?? "",
+        grupo_codigo: grupo?.codigo ?? "",
+        grupo_descripcion: grupo?.descripcion ?? "",
+        cantidad_actual: Number(row.cantidad_actual ?? 0),
+    };
+}
+
+export async function listArticulosPorDepositos(idsDepositos) {
+    const ids = [...new Set((idsDepositos ?? []).filter(Boolean).map((id) => String(id)))];
+    if (!ids.length) return [];
     const supabase = createBrowserClient();
-    const { data, error } = await supabase
-        .from("inventario_depositos")
-        .select("cantidad_actual, articulos:id_articulo ( id, codigo, nombre, unidad_de_medida, is_epp, estado, grupos:id_grupo ( codigo, descripcion, familias:id_familia ( codigo, descripcion ) ) )")
-        .eq("id_deposito", idDeposito)
-        .order("id");
-    if (error) throw error;
-    return (data ?? []).flatMap((row) => {
-        const art = Array.isArray(row.articulos) ? row.articulos[0] : row.articulos;
-        if (!art) return [];
-        const grupo = Array.isArray(art.grupos) ? art.grupos[0] : art.grupos;
-        const familia = grupo
-            ? (Array.isArray(grupo.familias) ? grupo.familias[0] : grupo.familias)
-            : null;
-        return [{
-            codigo: art.codigo,
-            nombre: art.nombre,
-            unidad_de_medida: art.unidad_de_medida,
-            is_epp: art.is_epp === true || art.is_epp === "t" || art.is_epp === "true" || art.is_epp === "X",
-            estado: art.estado,
-            familia_codigo: familia?.codigo ?? "",
-            familia_descripcion: familia?.descripcion ?? "",
-            grupo_codigo: grupo?.codigo ?? "",
-            grupo_descripcion: grupo?.descripcion ?? "",
-            cantidad_actual: Number(row.cantidad_actual ?? 0),
-        }];
-    });
+    const collected = [];
+    const pageSize = 500;
+    for (const chunk of chunkIds(ids, 80)) {
+        let from = 0;
+        while (true) {
+            const { data, error } = await supabase
+                .from("inventario_depositos")
+                .select(INVENTARIO_ARTICULO_SELECT)
+                .in("id_deposito", chunk)
+                .order("id")
+                .range(from, from + pageSize - 1);
+            if (error) throw error;
+            const rows = data ?? [];
+            for (const row of rows) {
+                const mapped = mapInventarioArticulo(row);
+                if (mapped) collected.push(mapped);
+            }
+            if (rows.length < pageSize) break;
+            from += pageSize;
+        }
+    }
+    return collected;
+}
+
+export async function listArticulosPorDeposito(idDeposito) {
+    return listArticulosPorDepositos([idDeposito]);
 }
 
 async function insertCosto(supabase, idArticulo, costo) {
@@ -526,12 +596,109 @@ export async function updateArticulo(id, input) {
 
 const ARTICULOS_MASIVO_CHUNK = 400;
 
-export async function upsertArticulos(inputs) {
+function etiquetaFamiliaCarga(codigo, labels) {
+    const key = String(codigo ?? "").trim();
+    if (!key) return "sin familia";
+    return labels.get(key.toLowerCase()) || key;
+}
+
+function fraseCantidadArticulos(count, label) {
+    const art = count === 1 ? "artículo" : "artículos";
+    return `${count} ${art} a ${label}`;
+}
+
+export function mensajeCargaMasivaArticulos({
+    altas,
+    updated,
+    created = 0,
+    quitados = 0,
+    alcanceLabel = "",
+}) {
+    const partes = [];
+    if (altas.length > 0) {
+        const totalAltas = altas.reduce((sum, item) => sum + item.count, 0);
+        const listado = altas.map((item) => fraseCantidadArticulos(item.count, item.label));
+        const unidos = listado.length === 1
+            ? listado[0]
+            : `${listado.slice(0, -1).join(", ")} y ${listado[listado.length - 1]}`;
+        partes.push(totalAltas === 1 ? `Se agregó ${unidos}.` : `Se agregaron ${unidos}.`);
+    } else if (created > 0) {
+        partes.push(created === 1 ? "Se agregó 1 artículo." : `Se agregaron ${created} artículos.`);
+    }
+    if (updated > 0) {
+        partes.push(updated === 1 ? "Se editó 1 artículo." : `Se editaron ${updated} artículos.`);
+    }
+    if (quitados > 0) {
+        const donde = alcanceLabel ? ` de ${alcanceLabel}` : "";
+        partes.push(quitados === 1
+            ? `En el Excel no estaba 1 artículo${donde}.`
+            : `En el Excel no estaban ${quitados} artículos${donde}.`);
+    }
+    return partes.length
+        ? partes.join(" ")
+        : "Carga masiva lista: ningún artículo cambió.";
+}
+
+async function existingArticuloCodigoSet(supabase, codigos) {
+    const set = new Set();
+    const unique = [...new Set(codigos.map((codigo) => String(codigo ?? "").trim()).filter(Boolean))];
+    for (const chunk of chunkIds(unique, 120)) {
+        const { data, error } = await supabase
+            .from("articulos")
+            .select("codigo")
+            .in("codigo", chunk);
+        if (error) throw error;
+        for (const row of data ?? []) set.add(String(row.codigo).toLowerCase());
+    }
+    return set;
+}
+
+async function etiquetasFamiliaPorCodigo(supabase, codigos) {
+    const labels = new Map();
+    const unique = [...new Set(codigos.map((codigo) => String(codigo ?? "").trim()).filter(Boolean))];
+    if (!unique.length) return labels;
+    const { data, error } = await supabase
+        .from("familias")
+        .select("codigo, descripcion");
+    if (error) throw error;
+    for (const row of data ?? []) {
+        const key = String(row.codigo).toLowerCase();
+        labels.set(key, `${row.codigo} – ${row.descripcion}`);
+    }
+    return labels;
+}
+
+export async function upsertArticulos(inputs, { existentes = [], alcanceLabel = "" } = {}) {
     const supabase = createBrowserClient();
     let created = 0;
     let updated = 0;
     let unchanged = 0;
     const total = inputs.length;
+    const excelCodes = new Set(inputs.map((row) => String(row.codigo).toLowerCase()));
+    const vistos = new Set();
+    const quitados = [];
+    for (const row of existentes) {
+        const key = String(row.codigo ?? "").trim().toLowerCase();
+        if (!key || vistos.has(key)) continue;
+        vistos.add(key);
+        if (!excelCodes.has(key)) quitados.push(row);
+    }
+    const existentesCodigos = await existingArticuloCodigoSet(supabase, inputs.map((row) => row.codigo));
+    const altasMap = new Map();
+    for (const row of inputs) {
+        if (existentesCodigos.has(String(row.codigo).toLowerCase())) continue;
+        const key = String(row.familia_codigo ?? "").trim().toLowerCase();
+        altasMap.set(key, (altasMap.get(key) ?? 0) + 1);
+    }
+    const labels = await etiquetasFamiliaPorCodigo(supabase, [...altasMap.keys()]);
+    const altas = [...altasMap.entries()]
+        .filter(([, count]) => count > 0)
+        .sort((a, b) => a[0].localeCompare(b[0], "es", { numeric: true }))
+        .map(([codigo, count]) => ({
+            codigo,
+            count,
+            label: etiquetaFamiliaCarga(codigo, labels),
+        }));
 
     for (let index = 0; index < inputs.length; index += ARTICULOS_MASIVO_CHUNK) {
         const slice = inputs.slice(index, index + ARTICULOS_MASIVO_CHUNK);
@@ -545,10 +712,17 @@ export async function upsertArticulos(inputs) {
         unchanged += Number(data?.unchanged ?? 0);
     }
 
-    if (created + updated > 0) {
+    const mensaje = mensajeCargaMasivaArticulos({
+        altas: created > 0 ? altas : [],
+        updated,
+        created,
+        quitados: quitados.length,
+        alcanceLabel,
+    });
+    if (created + updated + quitados.length > 0) {
         const { error: notifyError } = await supabase.rpc("fn_insertar_notificacion_por_nombre", {
             p_tipo: "Carga_Masiva",
-            p_descripcion: `Carga masiva de artículos: ${created} creados y ${updated} editados.`,
+            p_descripcion: mensaje,
             p_tabla: "articulos",
             p_valor: null,
             p_metadata: {
@@ -556,7 +730,10 @@ export async function upsertArticulos(inputs) {
                 creados: created,
                 editados: updated,
                 sin_cambios: unchanged,
+                omitidos_excel: quitados.length,
                 total,
+                por_familia: altas,
+                alcance: alcanceLabel || null,
             },
         });
         if (notifyError) throw notifyError;
@@ -567,7 +744,49 @@ export async function upsertArticulos(inputs) {
         updated,
         created,
         unchanged,
+        quitados: quitados.length,
+        mensaje,
+        altas,
     };
+}
+
+function isMissingRpc(error) {
+    const text = errorText(error);
+    return error?.code === "PGRST202"
+        || /Could not find the function|does not exist|42883|schema cache/i.test(text);
+}
+
+async function eliminarArticuloDirecto(supabase, id) {
+    const { data: art, error: artError } = await supabase
+        .from("articulos")
+        .select("id, codigo, nombre")
+        .eq("id", id)
+        .maybeSingle();
+    if (artError) throw artError;
+    if (!art) throw new Error("El artículo no existe");
+
+    const { count, error: movError } = await supabase
+        .from("movimientos_articulos")
+        .select("id", { count: "exact", head: true })
+        .eq("id_articulo", id);
+    if (movError) throw movError;
+    if ((count ?? 0) > 0) {
+        throw new Error("No se puede eliminar: hay movimientos en el historial. Desactivalo para que no se puedan hacer más movimientos con él.");
+    }
+
+    const { error: invError } = await supabase.from("inventario_depositos").delete().eq("id_articulo", id);
+    if (invError) throw invError;
+    const { error: costoError } = await supabase.from("costos_articulos").delete().eq("id_articulo", id);
+    if (costoError) throw costoError;
+    const { error: delError } = await supabase.from("articulos").delete().eq("id", id);
+    if (delError) throw delError;
+
+    await supabase.rpc("fn_insertar_notificacion_por_nombre", {
+        p_tipo: "Eliminacion",
+        p_descripcion: `Se eliminó el artículo ${art.codigo} – ${art.nombre}.`,
+        p_tabla: "articulos",
+        p_valor: id,
+    });
 }
 
 export async function eliminarArticulo(id) {
@@ -575,7 +794,44 @@ export async function eliminarArticulo(id) {
     const { error } = await supabase.rpc("rpc_eliminar_articulo", {
         p_articulo: id,
     });
+    if (!error) return;
+    if (!isMissingRpc(error)) throw error;
+    await eliminarArticuloDirecto(supabase, id);
+}
+
+export async function desactivarArticulo(articulo) {
+    await updateArticulo(articulo.id, {
+        ...articulo,
+        estado: "inactivo",
+        nuevoCosto: "",
+    });
+}
+
+export async function resumenMovimientosArticulo(idArticulo) {
+    const supabase = createBrowserClient();
+    const { data, error } = await supabase
+        .from("movimientos_articulos")
+        .select("id, id_movimiento, movimientos:id_movimiento ( id, tipos_movimiento ( tipo ) )")
+        .eq("id_articulo", idArticulo);
     if (error) throw error;
+
+    const counts = new Map();
+    const seenMov = new Set();
+    for (const row of data ?? []) {
+        const movId = row.id_movimiento ?? embedOne(row.movimientos)?.id;
+        if (movId && seenMov.has(movId)) continue;
+        if (movId) seenMov.add(movId);
+        const tipoRow = embedOne(embedOne(row.movimientos)?.tipos_movimiento);
+        const tipo = tipoRow?.tipo || "Movimiento";
+        counts.set(tipo, (counts.get(tipo) ?? 0) + 1);
+    }
+
+    return {
+        total: seenMov.size || (data ?? []).length,
+        porTipo: [...counts.entries()]
+            .map(([tipo, cantidad]) => ({ tipo, cantidad }))
+            .sort((a, b) => a.tipo.localeCompare(b.tipo, "es")),
+    };
 }
 
 export async function listCostosArticulo(idArticulo) {

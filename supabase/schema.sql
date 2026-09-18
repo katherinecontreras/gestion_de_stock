@@ -722,6 +722,10 @@ BEGIN
   SELECT * INTO STRICT v_mov FROM public.movimientos WHERE id = NEW.id_movimiento;
   SELECT tipo INTO STRICT v_tipo FROM public.tipos_movimiento WHERE id = v_mov.id_tipo;
 
+  IF COALESCE((SELECT estado FROM public.articulos WHERE id = NEW.id_articulo), 'inactivo') <> 'activo' THEN
+    RAISE EXCEPTION 'El artículo está inactivo. No se pueden hacer más movimientos con él.';
+  END IF;
+
   UPDATE public.movimientos
   SET cant_total_articulos = cant_total_articulos + NEW.cantidad
   WHERE id = NEW.id_movimiento;
@@ -2822,7 +2826,7 @@ BEGIN
     FROM public.movimientos_articulos ma
     WHERE ma.id_articulo = p_articulo
   ) THEN
-    RAISE EXCEPTION 'No se puede eliminar: hay movimientos en el historial. Poné el estado en Inactivo.';
+    RAISE EXCEPTION 'No se puede eliminar: hay movimientos en el historial. Desactivalo para que no se puedan hacer más movimientos con él.';
   END IF;
 
   PERFORM set_config('app.carga_masiva', '1', true);
@@ -2842,6 +2846,7 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.rpc_eliminar_articulo(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.rpc_eliminar_articulo(uuid) TO authenticated;
 
 DROP FUNCTION IF EXISTS public.rpc_upsert_articulos_masivo(jsonb);

@@ -16,21 +16,26 @@ import { useToast } from "@/app/layouts/ToastProvider";
 import {
     ARTICULOS_PAGE_SIZE,
     createArticulo,
+    desactivarArticulo,
     eliminarArticulo,
     explainArticuloError,
     findArticuloPorCodigo,
+    fraseMovimientosArticulo,
     listArticulosExport,
     listArticulosPagina,
     listArticulosPorDeposito,
+    listArticulosPorDepositos,
     listDepositosOpciones,
     listFamiliasOpciones,
     listGruposOpciones,
     nextArticuloCodigoSugerido,
+    resumenMovimientosArticulo,
     updateArticulo,
     upsertArticulos,
 } from "@/services/articulos";
 import { listDepositosPropios } from "@/services/depositos";
-import { downloadArticulosExcel, parseArticulosExcel } from "@/utils/excel-articulos";
+import { listFamiliasResumen } from "@/services/familias";
+import { downloadArticulosExcel, downloadArticulosPorDepositosExcel, downloadArticulosPorFamiliasExcel, excelSheetLabel, parseArticulosExcel } from "@/utils/excel-articulos";
 import { cn } from "@/utils/cn";
 import { formatCurrency, formatFamiliaGrupo } from "@/utils/format";
 import { hintCodigoUnico, mensajeArticuloCodigoOcupado } from "@/utils/codigo-unico";
@@ -88,6 +93,102 @@ function FamiliaGrupoSelects({ familias, grupos, idFamilia, idGrupo, onFamilia, 
     );
 }
 
+function ExcelFormatoCampos({
+    mode,
+    onModeChange,
+    depositoId,
+    onDepositoChange,
+    familiaId,
+    onFamiliaChange,
+    grupoId,
+    onGrupoChange,
+    depositos,
+    familias,
+    grupos,
+    variant = "download",
+    emptyDepositoMessage = "No hay depósitos con artículos para descargar.",
+}) {
+    const esCarga = variant === "upload";
+    const deposito = depositos.find((item) => item.id === depositoId) ?? null;
+    const familia = familias.find((item) => item.id === familiaId) ?? null;
+    let hint = esCarga ? "Se lee la hoja Artículos." : "";
+    if (mode === "deposito") {
+        hint = deposito
+            ? (esCarga
+                ? `Se busca la hoja “${deposito.codigo} – ${deposito.nombre}”.`
+                : "La planilla se llama con el código y el nombre de ese depósito.")
+            : (esCarga
+                ? "Se lee la hoja Depósitos y una planilla por cada depósito."
+                : "Se arma una hoja Depósitos y una planilla por cada depósito (código y nombre).");
+    } else if (mode === "familia") {
+        hint = familia
+            ? (esCarga
+                ? `Se busca la hoja “${formatFamiliaGrupo(familia.codigo, familia.descripcion)}”.`
+                : "La planilla se llama con el código y la descripción de esa familia.")
+            : (esCarga
+                ? "Se lee la hoja Familias y una planilla por cada código de familia."
+                : "Se arma una hoja Familias y una planilla por cada código de familia.");
+    }
+    return (
+        <div className="space-y-3">
+            <select
+                value={mode}
+                onChange={(event) => onModeChange(event.target.value)}
+                className="w-full rounded-control border border-app-input bg-app-surface px-3 py-2 text-sm focus:border-app-focus focus:ring-1 focus:ring-app-focus"
+            >
+                <option value="todos">Todos los artículos</option>
+                <option value="deposito">Por depósito</option>
+                <option value="familia">Por familia / grupo</option>
+            </select>
+            {mode === "deposito" ? (
+                depositos.length ? (
+                    <SearchSelect
+                        value={depositoId}
+                        onChange={onDepositoChange}
+                        emptyOption="Todos los depósitos"
+                        placeholder="Buscar depósito…"
+                        options={depositos.map((item) => ({
+                            value: item.id,
+                            label: `${item.codigo} – ${item.nombre}`,
+                        }))}
+                    />
+                ) : (
+                    <p className="text-sm text-app-mutedtext">{emptyDepositoMessage}</p>
+                )
+            ) : null}
+            {mode === "familia" ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                    <SearchSelect
+                        value={familiaId}
+                        onChange={(next) => {
+                            onFamiliaChange(next);
+                            onGrupoChange("");
+                        }}
+                        emptyOption="Todas las familias"
+                        placeholder="Buscar familia…"
+                        options={familias.map((item) => ({
+                            value: item.id,
+                            label: formatFamiliaGrupo(item.codigo, item.descripcion),
+                        }))}
+                    />
+                    <SearchSelect
+                        value={grupoId}
+                        onChange={onGrupoChange}
+                        disabled={!familiaId}
+                        emptyOption="Todos los grupos"
+                        placeholder="Buscar grupo…"
+                        options={grupos.filter((item) => item.id_familia === familiaId).map((item) => ({
+                            value: item.id,
+                            label: formatFamiliaGrupo(item.codigo, item.descripcion),
+                        }))}
+                    />
+                </div>
+            ) : null}
+            {hint ? <p className="text-xs text-app-mutedtext">{hint}</p> : null}
+        </div>
+    );
+}
+
 export function ArticulosScreen() {
     const navigate = useNavigate();
     const { perfil, loading: perfilLoading } = usePerfilSesion();
@@ -113,9 +214,14 @@ export function ArticulosScreen() {
     const [create, setCreate] = useState(emptyCreate());
     const [createError, setCreateError] = useState(null);
     const [toDelete, setToDelete] = useState(null);
+    const [deleteResumen, setDeleteResumen] = useState(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadFile, setUploadFile] = useState(null);
     const [uploadError, setUploadError] = useState(null);
+    const [uploadMode, setUploadMode] = useState("todos");
+    const [uploadDeposito, setUploadDeposito] = useState("");
+    const [uploadFamilia, setUploadFamilia] = useState("");
+    const [uploadGrupo, setUploadGrupo] = useState("");
     const [dragging, setDragging] = useState(false);
     const [downloadOpen, setDownloadOpen] = useState(false);
     const [downloadMode, setDownloadMode] = useState("todos");
@@ -134,6 +240,10 @@ export function ArticulosScreen() {
     const soloMisDepositos = isResponsable;
     const depositosConArchivos = useMemo(
         () => depositos.filter((dep) => Number(dep.cant_articulos ?? 0) > 0 && (dep.estado === "activo" || isAdmin)),
+        [depositos, isAdmin],
+    );
+    const depositosCarga = useMemo(
+        () => depositos.filter((dep) => dep.estado === "activo" || isAdmin),
         [depositos, isAdmin],
     );
 
@@ -227,6 +337,25 @@ export function ArticulosScreen() {
         return () => window.clearTimeout(timer);
     }, [create.codigo, createOpen]);
 
+    useEffect(() => {
+        if (!toDelete) {
+            setDeleteResumen(null);
+            return;
+        }
+        let cancelled = false;
+        setDeleteResumen(null);
+        resumenMovimientosArticulo(toDelete.id)
+            .then((resumen) => {
+                if (!cancelled) setDeleteResumen(resumen);
+            })
+            .catch(() => {
+                if (!cancelled) setDeleteResumen({ total: 0, porTipo: [], unknown: true });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [toDelete]);
+
     const gruposDelFiltro = useMemo(
         () => grupos.filter((g) => !filtroFamilia || g.id_familia === filtroFamilia),
         [grupos, filtroFamilia],
@@ -318,10 +447,38 @@ export function ArticulosScreen() {
         }
     }
 
+    const deleteTieneMovimientos = Boolean(deleteResumen && !deleteResumen.unknown && deleteResumen.total > 0);
+    const deleteYaInactivo = toDelete?.estado === "inactivo";
+    const deleteChecking = Boolean(toDelete) && deleteResumen === null;
+    const deleteFraseMovimientos = fraseMovimientosArticulo(deleteResumen);
+    const deleteDescription = !toDelete
+        ? ""
+        : deleteChecking
+            ? `Revisando si “${toDelete.codigo} – ${toDelete.nombre}” tiene movimientos…`
+            : deleteTieneMovimientos
+                ? (
+                    deleteYaInactivo
+                        ? `“${toDelete.codigo} – ${toDelete.nombre}” tiene ${deleteFraseMovimientos} en el historial, por eso no se puede eliminar. Ya está inactivo: no se pueden hacer más movimientos con él.`
+                        : `“${toDelete.codigo} – ${toDelete.nombre}” tiene ${deleteFraseMovimientos} en el historial, por eso no se puede eliminar. Si confirmás, se desactiva y ya no se van a poder hacer más movimientos con él. El historial se conserva.`
+                )
+                : `Si confirmás, se elimina “${toDelete.codigo} – ${toDelete.nombre}” de forma permanente. No hay vuelta atrás.`;
+
     async function handleDelete() {
-        if (!toDelete) return;
+        if (!toDelete || deleteChecking) return;
+        if (deleteTieneMovimientos && deleteYaInactivo) {
+            setToDelete(null);
+            return;
+        }
         setSaving(true);
         try {
+            if (deleteTieneMovimientos) {
+                await desactivarArticulo(toDelete);
+                await reloadPagina(page);
+                setToDelete(null);
+                if (draft?.id === toDelete.id) setDraft(null);
+                notify("Artículo desactivado. Ya no se puede usar en movimientos nuevos.", "success");
+                return;
+            }
             await eliminarArticulo(toDelete.id);
             await reloadPagina(page);
             setToDelete(null);
@@ -349,20 +506,43 @@ export function ArticulosScreen() {
         setUploadError(null);
         try {
             const buffer = await uploadFile.arrayBuffer();
-            const filas = parseArticulosExcel(buffer);
-            const result = await upsertArticulos(filas);
+            const fam = familias.find((item) => item.id === uploadFamilia);
+            const grupo = grupos.find((item) => item.id === uploadGrupo);
+            const dep = depositos.find((item) => item.id === uploadDeposito);
+            const filas = parseArticulosExcel(buffer, {
+                mode: uploadMode,
+                familiaCodigo: uploadMode === "familia" ? (fam?.codigo ?? "") : "",
+                familiaDescripcion: uploadMode === "familia" ? (fam?.descripcion ?? "") : "",
+                grupoCodigo: uploadMode === "familia" ? (grupo?.codigo ?? "") : "",
+                depositoCodigo: uploadMode === "deposito" ? (dep?.codigo ?? "") : "",
+                depositoNombre: uploadMode === "deposito" ? (dep?.nombre ?? "") : "",
+            });
+            let existentes = [];
+            if (uploadMode === "deposito") {
+                existentes = uploadDeposito
+                    ? await listArticulosPorDeposito(uploadDeposito)
+                    : await listArticulosPorDepositos(depositosCarga.map((item) => item.id));
+            } else {
+                existentes = await listArticulosExport({
+                    idFamilia: uploadMode === "familia" ? uploadFamilia : "",
+                    idGrupo: uploadMode === "familia" ? uploadGrupo : "",
+                });
+            }
+            let alcanceLabel = "todos los artículos";
+            if (uploadMode === "familia") {
+                alcanceLabel = fam
+                    ? (grupo
+                        ? `${formatFamiliaGrupo(fam.codigo, fam.descripcion)} / ${formatFamiliaGrupo(grupo.codigo, grupo.descripcion)}`
+                        : formatFamiliaGrupo(fam.codigo, fam.descripcion))
+                    : "todas las familias";
+            } else if (uploadMode === "deposito") {
+                alcanceLabel = dep ? `${dep.codigo} – ${dep.nombre}` : "todos los depósitos";
+            }
+            const result = await upsertArticulos(filas, { existentes, alcanceLabel });
             await reloadPagina(0);
             setPage(0);
             setUploadOpen(false);
-            const parts = [];
-            if (result.created) parts.push(`${result.created} creados`);
-            if (result.updated) parts.push(`${result.updated} editados`);
-            notify(
-                result.created + result.updated === 0
-                    ? "Carga masiva lista: ningún artículo cambió."
-                    : `Carga masiva lista: ${parts.join(" y ")}.`,
-                "success",
-            );
+            notify(result.mensaje, "success");
         } catch (error) {
             setUploadError(explainArticuloError(error));
         } finally {
@@ -370,27 +550,79 @@ export function ArticulosScreen() {
         }
     }
 
+    async function familiasParaExcel(articulos) {
+        let resumen = [];
+        try {
+            resumen = await listFamiliasResumen();
+        } catch {
+            const unique = new Map();
+            for (const row of articulos) {
+                const codigo = String(row.familia_codigo ?? "").trim();
+                if (!codigo || unique.has(codigo.toLowerCase())) continue;
+                unique.set(codigo.toLowerCase(), {
+                    codigo,
+                    descripcion: row.familia_descripcion ?? "",
+                });
+            }
+            resumen = [...unique.values()];
+        }
+        if (!soloMisDepositos) return resumen;
+        const presentes = new Set(
+            articulos.map((row) => String(row.familia_codigo ?? "").trim().toLowerCase()).filter(Boolean),
+        );
+        return resumen.filter((familia) => presentes.has(String(familia.codigo).toLowerCase()));
+    }
+
     async function handleDownload() {
         if (downloading) return;
-        if (downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length)) {
-            notify("Elegí un depósito con artículos.", "error");
+        if (downloadMode === "deposito" && !depositosConArchivos.length) {
+            notify("No hay depósitos con artículos para descargar.", "error");
             return;
         }
         setDownloading(true);
         try {
             if (downloadMode === "deposito") {
-                const dep = depositos.find((d) => d.id === downloadDeposito);
-                const data = await listArticulosPorDeposito(downloadDeposito);
-                downloadArticulosExcel(data, `articulos-${dep?.codigo ?? "deposito"}.xlsx`, ["CANTIDAD"]);
+                if (downloadDeposito) {
+                    const dep = depositos.find((d) => d.id === downloadDeposito);
+                    const data = await listArticulosPorDeposito(downloadDeposito);
+                    const sheetName = excelSheetLabel(dep?.codigo, dep?.nombre);
+                    downloadArticulosExcel(data, `articulos-${dep?.codigo ?? "deposito"}.xlsx`, ["CANTIDAD"], sheetName);
+                } else {
+                    const articulos = await listArticulosPorDepositos(depositosConArchivos.map((dep) => dep.id));
+                    if (!articulos.length) {
+                        notify("No hay artículos en esos depósitos.", "error");
+                        return;
+                    }
+                    downloadArticulosPorDepositosExcel(
+                        { depositos: depositosConArchivos, articulos },
+                        "articulos-depositos.xlsx",
+                    );
+                }
             } else if (downloadMode === "familia") {
-                const data = await listArticulosExport({
+                const articulos = await listArticulosExport({
                     idFamilia: downloadFamilia,
                     idGrupo: downloadGrupo,
                     soloMisDepositos,
                 });
-                downloadArticulosExcel(data, "articulos-familia-grupo.xlsx");
+                if (downloadFamilia) {
+                    const fam = familias.find((item) => item.id === downloadFamilia);
+                    const sheetName = excelSheetLabel(
+                        fam?.codigo ?? articulos[0]?.familia_codigo,
+                        fam?.descripcion ?? articulos[0]?.familia_descripcion,
+                    );
+                    downloadArticulosExcel(
+                        articulos,
+                        `articulos-${fam?.codigo ?? "familia"}.xlsx`,
+                        [],
+                        sheetName,
+                    );
+                } else {
+                    const resumen = await familiasParaExcel(articulos);
+                    downloadArticulosPorFamiliasExcel({ familias: resumen, articulos }, "articulos-familias.xlsx");
+                }
             } else {
-                downloadArticulosExcel(await listArticulosExport({ soloMisDepositos }));
+                const articulos = await listArticulosExport({ soloMisDepositos });
+                downloadArticulosExcel(articulos, "articulos.xlsx");
             }
             setDownloadOpen(false);
             notify("Excel descargado.", "success");
@@ -443,6 +675,10 @@ export function ArticulosScreen() {
                                     onClick={() => {
                                         setUploadError(null);
                                         setUploadFile(null);
+                                        setUploadMode("todos");
+                                        setUploadDeposito("");
+                                        setUploadFamilia("");
+                                        setUploadGrupo("");
                                         setUploadOpen(true);
                                     }}
                                 >
@@ -570,7 +806,7 @@ export function ArticulosScreen() {
                             {rows.map((row, index) => {
                                 const editing = draft?.id === row.id;
                                 return (
-                                    <TableAppearRow key={row.id} index={index} className="border-t border-app-border-subtle align-middle">
+                                    <TableAppearRow key={`${row.id}-${index}`} index={index} className="border-t border-app-border-subtle align-middle">
                                         <td className="px-4 py-3">
                                             {editing ? (
                                                 <SearchSelect
@@ -855,12 +1091,13 @@ export function ArticulosScreen() {
             <FormModal
                 open={uploadOpen}
                 title="Carga masiva de artículos"
-                description="Usá el mismo Excel de la descarga. Un artículo nuevo entra activo. Si ya existe, no se toca el estado ni el costo. IS_EPP: X = sí, vacío = no."
+                description="Elegí cómo es el Excel (igual que al descargar) y después arrastralo. Así se lee solo esa planilla y el aviso dice qué se agregó, qué se editó y qué faltaba. No se eliminan artículos. IS_EPP: X = sí, vacío = no."
                 onClose={() => !saving && setUploadOpen(false)}
+                className="max-w-lg"
                 footer={
                     <>
                         <Button variant="secondary" disabled={saving} onClick={() => setUploadOpen(false)}>Cancelar</Button>
-                        <Button onClick={() => void handleUpload()} disabled={saving}>
+                        <Button onClick={() => void handleUpload()} disabled={saving || !uploadFile}>
                             {saving ? <Spinner className="h-4 w-4 text-white" /> : null}
                             Cargar Excel
                         </Button>
@@ -868,6 +1105,27 @@ export function ArticulosScreen() {
                 }
             >
                 {uploadError ? <Alert>{uploadError}</Alert> : null}
+                <ExcelFormatoCampos
+                    variant="upload"
+                    mode={uploadMode}
+                    onModeChange={(next) => {
+                        setUploadMode(next);
+                        setUploadError(null);
+                        if (next === "deposito" && !depositosCarga.some((dep) => dep.id === uploadDeposito)) {
+                            setUploadDeposito("");
+                        }
+                    }}
+                    depositoId={uploadDeposito}
+                    onDepositoChange={setUploadDeposito}
+                    familiaId={uploadFamilia}
+                    onFamiliaChange={setUploadFamilia}
+                    grupoId={uploadGrupo}
+                    onGrupoChange={setUploadGrupo}
+                    depositos={depositosCarga}
+                    familias={familias}
+                    grupos={grupos}
+                    emptyDepositoMessage="No hay depósitos para elegir. Podés cargar el Excel de todos los depósitos."
+                />
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -891,7 +1149,17 @@ export function ArticulosScreen() {
                 >
                     <Upload size={22} strokeWidth={1.6} className="mb-2 text-app-mutedtext" />
                     <span className="font-medium text-app-primary">Arrastrá el Excel o hacé clic para seleccionarlo</span>
-                    <span className="mt-1 text-xs text-app-mutedtext">FAMILIA, NOM_FAM, GRUPO, NOM_GRU, COD_ARTIC, DESCRIP, UNIDADMED, IS_EPP</span>
+                    <span className="mt-1 text-xs text-app-mutedtext">
+                        {uploadMode === "familia"
+                            ? (uploadFamilia
+                                ? "La hoja debe llamarse con el código y la descripción de esa familia."
+                                : "Hoja Familias y una planilla por código de familia.")
+                            : uploadMode === "deposito"
+                                ? (uploadDeposito
+                                    ? "La hoja debe llamarse con el código y el nombre de ese depósito. La cantidad no se carga."
+                                    : "Hoja Depósitos y una planilla por depósito. La cantidad no se carga: solo el catálogo.")
+                                : "Una sola hoja Artículos (FAMILIA, GRUPO, COD_ARTIC, DESCRIP, UNIDADMED, IS_EPP)."}
+                    </span>
                     {uploadFile ? (
                         <span className="mt-3 rounded-pill bg-app-surface px-3 py-1 text-xs font-medium text-app-secondarytext">{uploadFile.name}</span>
                     ) : null}
@@ -901,17 +1169,14 @@ export function ArticulosScreen() {
             <FormModal
                 open={downloadOpen}
                 title="Descargar archivos"
-                description="Todos, por depósito o por familia/grupo. El Excel sirve después para la carga masiva."
+                description="Todos los artículos va en una sola hoja. Por familia o por depósito: si elegís todas, hay una hoja principal y una por cada una; si elegís una sola, la planilla lleva su código y nombre."
                 onClose={() => setDownloadOpen(false)}
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => setDownloadOpen(false)}>Cancelar</Button>
                         <Button
                             onClick={() => void handleDownload()}
-                            disabled={
-                                downloading
-                                || (downloadMode === "deposito" && (!downloadDeposito || !depositosConArchivos.length))
-                            }
+                            disabled={downloading || (downloadMode === "deposito" && !depositosConArchivos.length)}
                         >
                             {downloading ? <Spinner className="h-4 w-4 text-white" /> : null}
                             {downloading ? "Descargando…" : "Descargar"}
@@ -920,80 +1185,41 @@ export function ArticulosScreen() {
                 }
             >
                 <div className="space-y-3">
-                    <select
-                        value={downloadMode}
-                        onChange={(event) => {
-                            const next = event.target.value;
+                    <ExcelFormatoCampos
+                        variant="download"
+                        mode={downloadMode}
+                        onModeChange={(next) => {
                             setDownloadMode(next);
                             if (next === "deposito" && !depositosConArchivos.some((dep) => dep.id === downloadDeposito)) {
                                 setDownloadDeposito("");
                             }
                         }}
-                        className="w-full rounded-control border border-app-input bg-app-surface px-3 py-2 text-sm focus:border-app-focus focus:ring-1 focus:ring-app-focus"
-                    >
-                        <option value="todos">Todos los artículos</option>
-                        <option value="deposito">Por depósito</option>
-                        <option value="familia">Por familia / grupo</option>
-                    </select>
+                        depositoId={downloadDeposito}
+                        onDepositoChange={setDownloadDeposito}
+                        familiaId={downloadFamilia}
+                        onFamiliaChange={setDownloadFamilia}
+                        grupoId={downloadGrupo}
+                        onGrupoChange={setDownloadGrupo}
+                        depositos={depositosConArchivos}
+                        familias={familias}
+                        grupos={grupos}
+                    />
                     {perfil?.esResponsableDeposito ? (
                         <p className="text-xs text-app-mutedtext">Solo se incluye lo de tus depósitos.</p>
-                    ) : null}
-                    {downloadMode === "deposito" ? (
-                        depositosConArchivos.length ? (
-                            <SearchSelect
-                                value={downloadDeposito}
-                                onChange={setDownloadDeposito}
-                                emptyOption="Elegí un depósito"
-                                placeholder="Buscar depósito…"
-                                options={depositosConArchivos.map((d) => ({
-                                    value: d.id,
-                                    label: `${d.codigo} – ${d.nombre}`,
-                                }))}
-                            />
-                        ) : (
-                            <p className="text-sm text-app-mutedtext">No hay depósitos con artículos para descargar.</p>
-                        )
-                    ) : null}
-                    {downloadMode === "familia" ? (
-                        <div className="grid gap-2 sm:grid-cols-2">
-                            <SearchSelect
-                                value={downloadFamilia}
-                                onChange={(next) => {
-                                    setDownloadFamilia(next);
-                                    setDownloadGrupo("");
-                                }}
-                                emptyOption="Todas las familias"
-                                placeholder="Buscar familia…"
-                                options={familias.map((f) => ({
-                                    value: f.id,
-                                    label: formatFamiliaGrupo(f.codigo, f.descripcion),
-                                }))}
-                            />
-                            <SearchSelect
-                                value={downloadGrupo}
-                                onChange={setDownloadGrupo}
-                                disabled={!downloadFamilia}
-                                emptyOption="Todos los grupos"
-                                placeholder="Buscar grupo…"
-                                options={grupos.filter((g) => g.id_familia === downloadFamilia).map((g) => ({
-                                    value: g.id,
-                                    label: formatFamiliaGrupo(g.codigo, g.descripcion),
-                                }))}
-                            />
-                        </div>
                     ) : null}
                 </div>
             </FormModal>
 
             <ConfirmDialog
                 open={Boolean(toDelete)}
-                title="Eliminar artículo"
-                description={
-                    toDelete
-                        ? `Si confirmás, se elimina “${toDelete.codigo} – ${toDelete.nombre}”. Si tiene movimientos, no se puede borrar: cambialo a inactivo.`
-                        : ""
-                }
-                pending={saving}
+                title={deleteTieneMovimientos ? "No se puede eliminar" : "Eliminar artículo"}
+                description={deleteDescription}
+                confirmLabel={deleteTieneMovimientos ? "Desactivar" : "Eliminar"}
+                cancelLabel={deleteTieneMovimientos && deleteYaInactivo ? "Entendido" : "Cancelar"}
+                confirmVariant={deleteTieneMovimientos ? "primary" : "danger"}
+                showConfirm={!deleteChecking && !(deleteTieneMovimientos && deleteYaInactivo)}
+                pending={saving || deleteChecking}
+                lockClose={saving}
                 onConfirm={() => void handleDelete()}
                 onClose={() => !saving && setToDelete(null)}
             />

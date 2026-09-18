@@ -8,7 +8,11 @@ export function ConfirmDialog({
     title,
     description,
     confirmLabel = "Eliminar",
+    cancelLabel = "Cancelar",
+    confirmVariant = "danger",
+    showConfirm = true,
     pending = false,
+    lockClose = false,
     onConfirm,
     onClose,
 }) {
@@ -41,13 +45,15 @@ export function ConfirmDialog({
                         </h2>
                         <p className="mt-2 text-sm leading-6 text-app-mutedtext">{description}</p>
                         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                            <Button variant="secondary" onClick={onClose} disabled={pending}>
-                                Cancelar
+                            <Button variant="secondary" onClick={onClose} disabled={lockClose}>
+                                {cancelLabel}
                             </Button>
-                            <Button variant="danger" onClick={onConfirm} disabled={pending}>
-                                {pending ? <Spinner className="h-4 w-4 text-white" /> : null}
-                                {confirmLabel}
-                            </Button>
+                            {showConfirm ? (
+                                <Button variant={confirmVariant} onClick={onConfirm} disabled={pending}>
+                                    {pending ? <Spinner className="h-4 w-4 text-current" /> : null}
+                                    {confirmLabel}
+                                </Button>
+                            ) : null}
                         </div>
                     </motion.div>
                 </div>
