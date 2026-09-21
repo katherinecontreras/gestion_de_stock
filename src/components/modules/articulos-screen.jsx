@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Download, History, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Ban, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Download, History, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { FormModal } from "@/components/modals/form-modal";
 import { Alert } from "@/components/ui/alert";
@@ -987,14 +987,27 @@ export function ArticulosScreen() {
                                                                     >
                                                                         <Pencil size={18} strokeWidth={1.7} />
                                                                     </Button>
-                                                                    <Button
-                                                                        variant="table"
-                                                                        aria-label={`Eliminar ${row.nombre}`}
-                                                                        disabled={Boolean(draft)}
-                                                                        onClick={() => setToDelete(row)}
-                                                                    >
-                                                                        <Trash2 size={18} strokeWidth={1.7} />
-                                                                    </Button>
+                                                                    {row.tiene_movimientos ? (
+                                                                        row.estado === "activo" ? (
+                                                                            <Button
+                                                                                variant="table"
+                                                                                aria-label={`Desactivar ${row.nombre}`}
+                                                                                disabled={Boolean(draft)}
+                                                                                onClick={() => setToDelete(row)}
+                                                                            >
+                                                                                <Ban size={18} strokeWidth={1.7} />
+                                                                            </Button>
+                                                                        ) : null
+                                                                    ) : (
+                                                                        <Button
+                                                                            variant="table"
+                                                                            aria-label={`Eliminar ${row.nombre}`}
+                                                                            disabled={Boolean(draft)}
+                                                                            onClick={() => setToDelete(row)}
+                                                                        >
+                                                                            <Trash2 size={18} strokeWidth={1.7} />
+                                                                        </Button>
+                                                                    )}
                                                                 </>
                                                             ) : null}
                                                         </>

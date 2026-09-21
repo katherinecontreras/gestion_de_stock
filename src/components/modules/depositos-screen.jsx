@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, ChevronsUpDown, Download, Package, Pencil, Plus, Search, Trash2, Upload, Users, X, } from "lucide-react";
+import { Ban, Check, ChevronDown, ChevronUp, ChevronsUpDown, Download, Package, Pencil, Plus, Search, Trash2, Upload, Users, X, } from "lucide-react";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { FormModal } from "@/components/modals/form-modal";
 import { Alert } from "@/components/ui/alert";
@@ -12,7 +12,7 @@ import { TableAppearRow, TableGhost, TableShell } from "@/components/ui/table";
 import { usePerfilSesion } from "@/hooks/use-perfil-sesion";
 import { useToast } from "@/app/layouts/ToastProvider";
 import { InventarioDepositoModal } from "@/components/modules/inventarios-panels";
-import { asignarResponsablesDeposito, createDeposito, eliminarDeposito, explainDepositoError, listDepositos, listDepositosPropios, listResponsablesOpciones, nextDepositoCodigoDesdeActivos, updateDeposito, upsertDepositos, } from "@/services/depositos";
+import { asignarResponsablesDeposito, createDeposito, desactivarDeposito, eliminarDeposito, explainDepositoError, listDepositos, listDepositosPropios, listResponsablesOpciones, nextDepositoCodigoDesdeActivos, updateDeposito, upsertDepositos, } from "@/services/depositos";
 import { downloadDepositosExcel, parseDepositosExcel } from "@/utils/excel-depositos";
 import { formatCurrency } from "@/utils/format";
 
@@ -43,7 +43,7 @@ export function DepositosScreen() {
     const [createName, setCreateName] = useState("");
     const [createUbicacion, setCreateUbicacion] = useState("");
     const [createError, setCreateError] = useState(null);
-    const [toDelete, setToDelete] = useState(null);
+    const [confirmAccion, setConfirmAccion] = useState(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadFile, setUploadFile] = useState(null);
     const [uploadError, setUploadError] = useState(null);
@@ -213,16 +213,41 @@ export function DepositosScreen() {
         }
     }
 
-    async function handleDelete() {
-        if (!toDelete)
+    function pedirAccionDeposito(row, forzar) {
+        if (forzar === "eliminar" || row.puedeEliminarse) {
+            setConfirmAccion({ deposito: row, tipo: "eliminar" });
             return;
+        }
+        if (row.tieneStock) {
+            setConfirmAccion({ deposito: row, tipo: "stock" });
+            return;
+        }
+        setConfirmAccion({ deposito: row, tipo: "desactivar" });
+    }
+
+    async function handleConfirmAccion() {
+        if (!confirmAccion)
+            return;
+        if (confirmAccion.tipo === "stock") {
+            setConfirmAccion(null);
+            return;
+        }
         setSaving(true);
         try {
-            await eliminarDeposito(toDelete.id);
+            if (confirmAccion.tipo === "desactivar") {
+                const updated = await desactivarDeposito(confirmAccion.deposito);
+                setRows((current) => current.map((row) => (row.id === updated.id ? updated : row)));
+                if (draft?.id === confirmAccion.deposito.id)
+                    setDraft(null);
+                setConfirmAccion(null);
+                notify("Depósito desactivado. Ya no se puede usar en movimientos nuevos. El historial se conserva.", "success");
+                return;
+            }
+            await eliminarDeposito(confirmAccion.deposito.id);
             await reload();
-            if (draft?.id === toDelete.id)
+            if (draft?.id === confirmAccion.deposito.id)
                 setDraft(null);
-            setToDelete(null);
+            setConfirmAccion(null);
             notify("Depósito eliminado.", "success");
         }
         catch (error) {
@@ -500,9 +525,15 @@ export function DepositosScreen() {
                         })}>
                               <Pencil size={18} strokeWidth={1.7}/>
                             </Button>
-                            <Button variant="table" aria-label={`Eliminar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => setToDelete(row)}>
+                            {row.puedeEliminarse ? (
+                            <Button variant="table" aria-label={`Eliminar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => pedirAccionDeposito(row, "eliminar")}>
                               <Trash2 size={18} strokeWidth={1.7}/>
                             </Button>
+                            ) : row.estado === "activo" ? (
+                            <Button variant="table" aria-label={`Desactivar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => pedirAccionDeposito(row)}>
+                              <Ban size={18} strokeWidth={1.7}/>
+                            </Button>
+                            ) : null}
                             </>) : null}
                           </>)}
                       </div>
@@ -532,9 +563,11 @@ export function DepositosScreen() {
                 <Button type="button" disabled={saving} onClick={() => void handleReactivar(createCodeOwner)}>
                   Reactivar
                 </Button>
-                <Button type="button" variant="danger" disabled={saving} onClick={() => setToDelete(createCodeOwner)}>
+                {createCodeOwner.puedeEliminarse ? (
+                <Button type="button" variant="danger" disabled={saving} onClick={() => pedirAccionDeposito(createCodeOwner, "eliminar")}>
                   Eliminar
                 </Button>
+                ) : null}
               </div>
             </div>) : createCodeOwner ? (<Alert>
               El código “{createCode.trim()}” pertenece al depósito “{createCodeOwner.nombre}”.
@@ -626,14 +659,27 @@ export function DepositosScreen() {
       {inventario ? <InventarioDepositoModal deposito={inventario} onClose={() => setInventario(null)} /> : null}
 
       <ConfirmDialog
-        open={Boolean(toDelete)}
-        title="Eliminar depósito"
-        description={toDelete
-          ? `Si eliminás “${toDelete.nombre}”, se borra de forma permanente y se quitan las asignaciones de responsables. No hay vuelta atrás. Solo se puede si no tiene stock ni movimientos. Si ya se usó, inactivalo con Editar: no se podrá usar en movimientos nuevos y el historial se conserva.`
-          : ""}
+        open={Boolean(confirmAccion)}
+        title={confirmAccion?.tipo === "eliminar"
+          ? "Eliminar depósito"
+          : confirmAccion?.tipo === "stock"
+            ? "No se puede desactivar"
+            : "Desactivar depósito"}
+        description={!confirmAccion
+          ? ""
+          : confirmAccion.tipo === "eliminar"
+            ? `Si confirmás, se elimina “${confirmAccion.deposito.nombre}” de forma permanente y se quitan las asignaciones de responsables. No hay vuelta atrás.`
+            : confirmAccion.tipo === "stock"
+              ? `“${confirmAccion.deposito.nombre}” todavía tiene ${confirmAccion.deposito.cant_articulos} artículo${Number(confirmAccion.deposito.cant_articulos) === 1 ? "" : "s"}. Transferilos antes de desactivarlo. No se puede eliminar porque ${confirmAccion.deposito.tieneMovimientos ? "tiene movimientos en el historial" : "tiene stock"}.`
+              : `“${confirmAccion.deposito.nombre}” tiene movimientos en el historial, por eso no se puede eliminar. Si confirmás, se desactiva y ya no se va a poder usar en movimientos nuevos. El historial se conserva.`}
+        confirmLabel={confirmAccion?.tipo === "desactivar" ? "Desactivar" : "Eliminar"}
+        cancelLabel={confirmAccion?.tipo === "stock" ? "Entendido" : "Cancelar"}
+        confirmVariant={confirmAccion?.tipo === "desactivar" ? "primary" : "danger"}
+        showConfirm={confirmAccion?.tipo !== "stock"}
         pending={saving}
-        onConfirm={() => void handleDelete()}
-        onClose={() => !saving && setToDelete(null)}
+        lockClose={saving}
+        onConfirm={() => void handleConfirmAccion()}
+        onClose={() => !saving && setConfirmAccion(null)}
       />
     </section>);
 }

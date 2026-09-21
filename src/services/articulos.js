@@ -214,6 +214,24 @@ function uniqueById(rows) {
     return unique;
 }
 
+async function withTieneMovimientos(supabase, rows) {
+    const unique = uniqueById(rows);
+    const ids = unique.map((row) => row.id);
+    if (ids.length === 0) return unique;
+    const used = new Set();
+    for (const chunk of chunkIds(ids, 120)) {
+        const { data, error } = await supabase
+            .from("movimientos_articulos")
+            .select("id_articulo")
+            .in("id_articulo", chunk);
+        if (error) throw error;
+        for (const row of data ?? []) {
+            if (row.id_articulo) used.add(row.id_articulo);
+        }
+    }
+    return unique.map((row) => ({ ...row, tiene_movimientos: used.has(row.id) }));
+}
+
 function embedOne(value) {
     return Array.isArray(value) ? value[0] ?? null : (value ?? null);
 }
@@ -295,7 +313,7 @@ export async function listArticulosPagina({
             }
         }
         collected.sort((a, b) => compareArticulos(a, b, sort));
-        const unique = uniqueById(collected);
+        const unique = await withTieneMovimientos(supabase, collected);
         return {
             rows: unique.slice(from, to + 1),
             total: unique.length,
@@ -313,7 +331,7 @@ export async function listArticulosPagina({
             .range(from, to);
         if (error) throw error;
         return {
-            rows: uniqueById((data ?? []).map(mapArticulo)),
+            rows: await withTieneMovimientos(supabase, (data ?? []).map(mapArticulo)),
             total: count ?? 0,
         };
     }
@@ -334,7 +352,7 @@ export async function listArticulosPagina({
     const rows = data ?? [];
     const costos = await costosActualesPorArticulos(supabase, rows.map((row) => row.id));
     return {
-        rows: uniqueById(rows.map((row) => mapArticuloDesdeTabla(row, costos.get(row.id) ?? null))),
+        rows: await withTieneMovimientos(supabase, rows.map((row) => mapArticuloDesdeTabla(row, costos.get(row.id) ?? null))),
         total: count ?? 0,
     };
 }
