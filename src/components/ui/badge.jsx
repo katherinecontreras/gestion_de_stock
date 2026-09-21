@@ -25,11 +25,11 @@ export function EstadoBadge({ estado }) {
     const inactivo = estado === "inactivo";
     return (<Badge tone={inactivo ? "error" : "ok"}>{inactivo ? "Inactivo" : "Activo"}</Badge>);
 }
-export function EstadoSelect({ value, onChange, className, inactivoDisabled = false }) {
+export function EstadoSelect({ value, onChange, className, inactivoDisabled = false, inactivoHint }) {
     return (<select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      title={inactivoDisabled ? "Transferí los artículos antes de pasarlo a inactivo." : undefined}
+      title={inactivoDisabled ? (inactivoHint || "No se puede pasar a inactivo.") : undefined}
       className={cn("rounded-control border border-app-input bg-app-surface px-2 py-1.5 text-sm text-app-primary", "focus:border-app-focus focus:ring-1 focus:ring-app-focus", className)}
     >
       <option value="activo">Activo</option>

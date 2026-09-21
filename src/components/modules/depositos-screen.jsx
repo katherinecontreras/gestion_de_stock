@@ -497,6 +497,7 @@ export function DepositosScreen() {
                             setDraft({ ...draft, estado });
                           }}
                           inactivoDisabled={Number(row.cant_articulos ?? 0) > 0}
+                          inactivoHint="Transferí los artículos antes de pasarlo a inactivo."
                         />
                       ) : (<EstadoBadge estado={row.estado}/>)}
                     </td>

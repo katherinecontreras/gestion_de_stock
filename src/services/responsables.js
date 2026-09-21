@@ -51,7 +51,39 @@ function mapResponsable(row) {
         depositos,
         depositoIds: depositos.map((item) => item.id),
         etiqueta: formatNombreCompleto(row.nombre, row.apellido) ?? "Sin nombre",
+        tieneHistorial: false,
+        puedeEliminarse: true,
+        esUltimoAdminActivo: false,
     };
+}
+
+function withUsoResponsable(rows, usados) {
+    const list = rows ?? [];
+    const adminActivos = list.filter((row) => row.rol === "Administrador" && row.estado === "activo").length;
+    return list.map((row) => {
+        const tieneHistorial = usados.has(row.id);
+        return {
+            ...row,
+            tieneHistorial,
+            puedeEliminarse: !tieneHistorial,
+            esUltimoAdminActivo: row.rol === "Administrador" && row.estado === "activo" && adminActivos <= 1,
+        };
+    });
+}
+
+async function idsResponsablesConMovimientos(supabase, ids) {
+    const list = [...new Set((ids ?? []).filter(Boolean))];
+    const used = new Set();
+    if (list.length === 0) return used;
+    const { data, error } = await supabase
+        .from("movimientos")
+        .select("id_responsable")
+        .in("id_responsable", list);
+    if (error) throw error;
+    for (const row of data ?? []) {
+        if (row.id_responsable) used.add(row.id_responsable);
+    }
+    return used;
 }
 
 export function explainResponsableError(errorOrMessage) {
@@ -63,7 +95,7 @@ export function explainResponsableError(errorOrMessage) {
         return "Ya hay un responsable con ese DNI o ese email.";
     }
     if (code === "23503" || /foreign key|historial/i.test(message)) {
-        return message || "No se puede borrar: este responsable tiene historial. Inactivalo si no querés que entre.";
+        return message || "No se puede borrar: este responsable tiene historial. Desactivalo si no querés que entre.";
     }
     if (code === "42501" || /row-level security|permission denied/i.test(message)) {
         return "No tenés permiso para administrar responsables.";
@@ -86,7 +118,9 @@ export async function listResponsablesAdmin() {
         .order("apellido", { ascending: true })
         .order("nombre", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(mapResponsable);
+    const mapped = (data ?? []).map(mapResponsable);
+    const usados = await idsResponsablesConMovimientos(supabase, mapped.map((row) => row.id));
+    return withUsoResponsable(mapped, usados);
 }
 
 export async function actualizarResponsable(input) {
@@ -104,8 +138,28 @@ export async function actualizarResponsable(input) {
     return data ?? {};
 }
 
+export async function desactivarResponsable(row) {
+    return actualizarResponsable({
+        id: row.id,
+        nombre: row.nombre,
+        apellido: row.apellido,
+        dni: row.dni,
+        rol: row.rol,
+        estado: "inactivo",
+        depositos: row.depositoIds ?? [],
+    });
+}
+
 export async function eliminarResponsable(id) {
     const supabase = createBrowserClient();
+    const { count, error: movError } = await supabase
+        .from("movimientos")
+        .select("id", { count: "exact", head: true })
+        .eq("id_responsable", id);
+    if (movError) throw movError;
+    if ((count ?? 0) > 0) {
+        throw new Error("No se puede borrar: este responsable tiene historial. Desactivalo si no querés que entre.");
+    }
     const { error } = await supabase.rpc("rpc_eliminar_responsable", { p_id: id });
     if (error) throw error;
 }

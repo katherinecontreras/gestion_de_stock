@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Ban, Pencil, Search, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { FormModal } from "@/components/modals/form-modal";
 import { Alert } from "@/components/ui/alert";
@@ -15,6 +15,7 @@ import { listDepositosActivos } from "@/services/depositos";
 import {
     ROL_OPCIONES,
     actualizarResponsable,
+    desactivarResponsable,
     eliminarResponsable,
     explainResponsableError,
     listResponsablesAdmin,
@@ -45,7 +46,7 @@ export function ResponsablesScreen() {
     const [depositoSearch, setDepositoSearch] = useState("");
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState(null);
-    const [toDelete, setToDelete] = useState(null);
+    const [confirmAccion, setConfirmAccion] = useState(null);
 
     const isAdmin = Boolean(perfil?.esAdministrador);
     const canView = isAdmin || Boolean(perfil?.esVistaDescarga);
@@ -151,13 +152,38 @@ export function ResponsablesScreen() {
         }
     }
 
-    async function handleDelete() {
-        if (!toDelete) return;
+    function pedirAccion(row, tipo) {
+        if (tipo === "eliminar" || row.puedeEliminarse) {
+            setConfirmAccion({ row, tipo: "eliminar" });
+            return;
+        }
+        if (row.esUltimoAdminActivo) {
+            setConfirmAccion({ row, tipo: "ultimo-admin" });
+            return;
+        }
+        setConfirmAccion({ row, tipo: "desactivar" });
+    }
+
+    async function handleConfirmAccion() {
+        if (!confirmAccion) return;
+        if (confirmAccion.tipo === "ultimo-admin") {
+            setConfirmAccion(null);
+            return;
+        }
         setSaving(true);
         try {
-            await eliminarResponsable(toDelete.id);
+            if (confirmAccion.tipo === "desactivar") {
+                await desactivarResponsable(confirmAccion.row);
+                await reload();
+                if (draft?.id === confirmAccion.row.id) setDraft(null);
+                setConfirmAccion(null);
+                notify("Responsable desactivado. Ya no puede ingresar. El historial se conserva.", "success");
+                return;
+            }
+            await eliminarResponsable(confirmAccion.row.id);
             await reload();
-            setToDelete(null);
+            if (draft?.id === confirmAccion.row.id) setDraft(null);
+            setConfirmAccion(null);
             notify("Responsable eliminado.", "success");
         } catch (error) {
             notify(explainResponsableError(error), "error");
@@ -268,9 +294,13 @@ export function ResponsablesScreen() {
                                                 <Button variant="table" aria-label={`Editar ${row.etiqueta}`} onClick={() => openEdit(row)}>
                                                     <Pencil size={18} strokeWidth={1.7} />
                                                 </Button>
-                                                {row.id !== perfil?.id ? (
-                                                    <Button variant="table" aria-label={`Eliminar ${row.etiqueta}`} onClick={() => setToDelete(row)}>
+                                                {row.id !== perfil?.id && row.puedeEliminarse ? (
+                                                    <Button variant="table" aria-label={`Eliminar ${row.etiqueta}`} onClick={() => pedirAccion(row, "eliminar")}>
                                                         <Trash2 size={18} strokeWidth={1.7} />
+                                                    </Button>
+                                                ) : row.id !== perfil?.id && row.estado === "activo" && !row.esUltimoAdminActivo ? (
+                                                    <Button variant="table" aria-label={`Desactivar ${row.etiqueta}`} onClick={() => pedirAccion(row, "desactivar")}>
+                                                        <Ban size={18} strokeWidth={1.7} />
                                                     </Button>
                                                 ) : null}
                                             </div>
@@ -325,7 +355,16 @@ export function ResponsablesScreen() {
                             </label>
                             <label className="flex w-full flex-col gap-1.5">
                                 <span className="text-sm font-medium text-app-secondarytext">Estado</span>
-                                <EstadoSelect value={draft.estado} onChange={(estado) => setDraft({ ...draft, estado })} />
+                                <EstadoSelect
+                                    value={draft.estado}
+                                    onChange={(estado) => {
+                                        const actual = rows.find((item) => item.id === draft.id);
+                                        if (estado === "inactivo" && actual?.esUltimoAdminActivo) return;
+                                        setDraft({ ...draft, estado });
+                                    }}
+                                    inactivoDisabled={Boolean(rows.find((item) => item.id === draft.id)?.esUltimoAdminActivo)}
+                                    inactivoHint="No se puede dejar la plataforma sin un administrador activo."
+                                />
                             </label>
                         </div>
                         {draft.rol === "Responsable_Deposito" ? (
@@ -365,14 +404,27 @@ export function ResponsablesScreen() {
             </FormModal>
 
             <ConfirmDialog
-                open={Boolean(toDelete)}
-                title="Eliminar responsable"
-                description={toDelete
-                    ? `Si confirmás, se borra a ${toDelete.etiqueta} y se desvincula de los depósitos. Si la base no puede borrarlo porque tiene historial, inactivalo con Editar.`
-                    : ""}
+                open={Boolean(confirmAccion)}
+                title={confirmAccion?.tipo === "eliminar"
+                    ? "Eliminar responsable"
+                    : confirmAccion?.tipo === "ultimo-admin"
+                        ? "No se puede desactivar"
+                        : "Desactivar responsable"}
+                description={!confirmAccion
+                    ? ""
+                    : confirmAccion.tipo === "eliminar"
+                        ? `Si confirmás, se borra a ${confirmAccion.row.etiqueta} y se desvincula de los depósitos. No hay vuelta atrás.`
+                        : confirmAccion.tipo === "ultimo-admin"
+                            ? `No se puede dejar la plataforma sin un administrador activo.`
+                            : `${confirmAccion.row.etiqueta} tiene movimientos en el historial, por eso no se puede eliminar. Si confirmás, queda inactivo y ya no puede ingresar. El historial se conserva.`}
+                confirmLabel={confirmAccion?.tipo === "desactivar" ? "Desactivar" : "Eliminar"}
+                cancelLabel={confirmAccion?.tipo === "ultimo-admin" ? "Entendido" : "Cancelar"}
+                confirmVariant={confirmAccion?.tipo === "desactivar" ? "primary" : "danger"}
+                showConfirm={confirmAccion?.tipo !== "ultimo-admin"}
                 pending={saving}
-                onConfirm={() => void handleDelete()}
-                onClose={() => !saving && setToDelete(null)}
+                lockClose={saving}
+                onConfirm={() => void handleConfirmAccion()}
+                onClose={() => !saving && setConfirmAccion(null)}
             />
         </section>
     );
