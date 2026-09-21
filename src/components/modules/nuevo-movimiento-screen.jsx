@@ -103,7 +103,7 @@ export function NuevoMovimientoScreen() {
         if (tipo === "Entrada") return Boolean(datos.destino);
         if (tipo === "Salida") {
             if (!datos.origen) return false;
-            if (datos.esDevolucion === "si") return Boolean(datos.proveedor);
+            if (datos.esDevolucion === "si") return Boolean(datos.proveedor && datos.motivo.trim());
             return Boolean(datos.destino);
         }
         if (tipo === "Transferencia") return Boolean(datos.origen && datos.destino && datos.origen !== datos.destino);
@@ -287,6 +287,10 @@ export function NuevoMovimientoScreen() {
                 return;
             }
         }
+        if (tipo === "Salida" && datos.esDevolucion === "si" && !datos.motivo.trim()) {
+            setError("Completá el motivo de la devolución.");
+            return;
+        }
         setSaving(true);
         setError(null);
         try {
@@ -298,7 +302,9 @@ export function NuevoMovimientoScreen() {
                     ? (datos.proveedor || null)
                     : null,
                 esDevolucion: tipo === "Salida" && datos.esDevolucion === "si",
-                motivo: tipo === "Transferencia" || tipo === "Entrega_EPP" ? datos.motivo : "",
+                motivo: tipo === "Transferencia" || tipo === "Entrega_EPP" || (tipo === "Salida" && datos.esDevolucion === "si")
+                    ? datos.motivo
+                    : "",
                 nroRemito: datos.nroRemito,
                 fotosRemito: fotos.map((foto) => foto.path),
                 articulos: seleccionados.map((row) => ({
@@ -429,7 +435,20 @@ export function NuevoMovimientoScreen() {
                                     </select>
                                 </label>
                                 {datos.esDevolucion === "si" ? (
-                                    <SelectProveedor label="Proveedor" value={datos.proveedor} options={proveedores} onChange={(proveedor) => setDatos({ ...datos, proveedor })} />
+                                    <>
+                                        <SelectProveedor label="Proveedor" value={datos.proveedor} options={proveedores} onChange={(proveedor) => setDatos({ ...datos, proveedor })} />
+                                        <label className="flex flex-col gap-1.5">
+                                            <span className="text-sm font-medium text-app-secondarytext">Motivo de la devolución</span>
+                                            <textarea
+                                                value={datos.motivo}
+                                                onChange={(event) => setDatos({ ...datos, motivo: event.target.value })}
+                                                rows={3}
+                                                required
+                                                placeholder="¿Por qué se devuelve?"
+                                                className={SELECT_CLASS}
+                                            />
+                                        </label>
+                                    </>
                                 ) : (
                                     <SelectDeposito label="Depósito destino" value={datos.destino} options={destinos} onChange={(destino) => setDatos({ ...datos, destino })} />
                                 )}
@@ -538,6 +557,19 @@ export function NuevoMovimientoScreen() {
                                         <option value="no">No</option>
                                         <option value="si">Sí</option>
                                     </select>
+                                </label>
+                            ) : null}
+                            {tipo === "Salida" && datos.esDevolucion === "si" ? (
+                                <label className="flex flex-col gap-1.5 sm:col-span-2">
+                                    <span className="text-sm font-medium text-app-secondarytext">Motivo de la devolución</span>
+                                    <textarea
+                                        value={datos.motivo}
+                                        onChange={(event) => setDatos({ ...datos, motivo: event.target.value })}
+                                        rows={2}
+                                        required
+                                        placeholder="¿Por qué se devuelve?"
+                                        className={SELECT_CLASS}
+                                    />
                                 </label>
                             ) : null}
                             {tipo === "Entrega_EPP" ? (

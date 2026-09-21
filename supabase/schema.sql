@@ -664,6 +664,9 @@ BEGIN
     IF NEW.es_devolucion AND NEW.id_proveedor IS NULL THEN
       RAISE EXCEPTION 'Una devolución requiere proveedor';
     END IF;
+    IF NEW.es_devolucion AND nullif(btrim(COALESCE(NEW.motivo, '')), '') IS NULL THEN
+      RAISE EXCEPTION 'Una devolución requiere el motivo';
+    END IF;
     NEW.tipo_entrega_epp := NULL;
     NEW.id_empleado := NULL;
     NEW.fecha_recambio := NULL;

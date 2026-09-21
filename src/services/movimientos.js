@@ -122,6 +122,9 @@ export function explainMovimientoError(errorOrMessage) {
     if (/número de remito/i.test(message)) {
         return "El número de remito es obligatorio.";
     }
+    if (/devolución requiere el motivo|motivo de la devolución/i.test(message)) {
+        return "Completá el motivo de la devolución.";
+    }
     if (/deben ser EPP/i.test(message)) {
         return "En una entrega EPP solo se pueden mover artículos EPP.";
     }
