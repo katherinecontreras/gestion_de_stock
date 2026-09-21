@@ -489,7 +489,16 @@ export function DepositosScreen() {
                       {row.responsableNombres || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      {editing ? (<EstadoSelect value={draft.estado} onChange={(estado) => setDraft({ ...draft, estado })}/>) : (<EstadoBadge estado={row.estado}/>)}
+                      {editing ? (
+                        <EstadoSelect
+                          value={draft.estado}
+                          onChange={(estado) => {
+                            if (estado === "inactivo" && Number(row.cant_articulos ?? 0) > 0) return;
+                            setDraft({ ...draft, estado });
+                          }}
+                          inactivoDisabled={Number(row.cant_articulos ?? 0) > 0}
+                        />
+                      ) : (<EstadoBadge estado={row.estado}/>)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {Number(row.cant_articulos ?? 0)}
@@ -529,7 +538,7 @@ export function DepositosScreen() {
                             <Button variant="table" aria-label={`Eliminar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => pedirAccionDeposito(row, "eliminar")}>
                               <Trash2 size={18} strokeWidth={1.7}/>
                             </Button>
-                            ) : row.estado === "activo" ? (
+                            ) : row.estado === "activo" && !row.tieneStock ? (
                             <Button variant="table" aria-label={`Desactivar ${row.nombre}`} disabled={Boolean(draft)} onClick={() => pedirAccionDeposito(row)}>
                               <Ban size={18} strokeWidth={1.7}/>
                             </Button>
