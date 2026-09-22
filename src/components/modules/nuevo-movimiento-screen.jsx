@@ -305,7 +305,7 @@ export function NuevoMovimientoScreen() {
                 motivo: tipo === "Transferencia" || tipo === "Entrega_EPP" || (tipo === "Salida" && datos.esDevolucion === "si")
                     ? datos.motivo
                     : "",
-                nroRemito: datos.nroRemito,
+                nroRemito: datos.nroRemito.trim(),
                 fotosRemito: fotos.map((foto) => foto.path),
                 articulos: seleccionados.map((row) => ({
                     id_articulo: row.id,
@@ -500,7 +500,7 @@ export function NuevoMovimientoScreen() {
                             </>
                         ) : null}
 
-                        <Input label="Nro. remito" value={datos.nroRemito} onChange={(event) => setDatos({ ...datos, nroRemito: event.target.value })} required />
+                        <RemitoNro value={datos.nroRemito} onChange={(nroRemito) => setDatos({ ...datos, nroRemito })} required />
                         <RemitoFotos fotos={fotos} fileRef={fileRef} onFiles={addFiles} onRemove={(path) => setFotos((current) => current.filter((foto) => foto.path !== path))} />
                     </div>
                 </Card>
@@ -596,7 +596,7 @@ export function NuevoMovimientoScreen() {
                             ) : null}
                         </div>
                         <div className="mt-4">
-                            <Input label="Nro. remito" value={datos.nroRemito} onChange={(event) => setDatos({ ...datos, nroRemito: event.target.value })} />
+                            <RemitoNro value={datos.nroRemito} onChange={(nroRemito) => setDatos({ ...datos, nroRemito })} />
                             <div className="mt-3">
                                 <RemitoFotos
                                     fotos={fotos}
@@ -745,6 +745,27 @@ function SelectProveedor({ label, value, options, onChange, allowEmpty = false }
                 label: row.etiqueta,
             }))}
         />
+    );
+}
+
+function RemitoNro({ value, onChange, required = false }) {
+    return (
+        <label className="flex w-full flex-col gap-1.5">
+            <span className="text-sm font-medium text-app-secondarytext">Nro. remito</span>
+            <textarea
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                required={required}
+                rows={2}
+                inputMode="text"
+                autoComplete="off"
+                placeholder="Uno o más, ej. 4521 / 4522"
+                className={SELECT_CLASS}
+            />
+            <span className="text-xs text-app-mutedtext">
+                Si hay más de un remito, escribilos juntos (4521 / 4522).
+            </span>
+        </label>
     );
 }
 
